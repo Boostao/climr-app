@@ -10,7 +10,7 @@ A shiny app for climate data and visualizations for North America
 ## How to run
 
 ```r
-shiny::runApp("./")
+shiny::runApp()
 ```
 
 ## How to Contribute
