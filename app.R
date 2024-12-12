@@ -4,6 +4,9 @@
 library(shiny)
 library(leaflet)
 library(leaflet.extras)
+library(terra)
+library(tibble)
+library(dplyr)
 library(DT)
 
 source("scripts/utils.R")
@@ -72,11 +75,12 @@ l <- leaflet::leaflet() |>
   ) |>
   leaflet::addLayersControl(
     baseGroups = c("Light", "Dark", "Satellite", "OpenStreetMap", "Hillshade"),
-    overlayGroups = c("Labels", "WNA BEC"),
+    overlayGroups = c("User features", "Labels", "WNA BEC"),
     position = "topright"
   ) |>
   leaflet::setView(lng = -100, lat = 50, zoom = 5) |>
-  leaflet::addMiniMap(toggleDisplay = TRUE, minimized = TRUE)
+  leaflet::addMiniMap(toggleDisplay = TRUE, minimized = TRUE) |>
+  default_draw_tool()
 
 # Shiny App ----
 
@@ -171,6 +175,32 @@ shiny::shinyApp(
   server = function(input, output, session) {
 
     output$climr <- leaflet::renderLeaflet(l)
+    map_proxy <- leaflet::leafletProxy('climr')
+    sg <- session_geometry(map_proxy)
+    map_click_enabled <- TRUE
+    map_click_ignore_next <- FALSE
+
+    ## Map click logic, on click add point
+    observeEvent(input$climr_draw_start, map_click_enabled <<- FALSE)
+    observeEvent(input$climr_draw_stop, {
+      if (input$climr_draw_stop$feature_type %in% c("rectangle", "circle")) map_click_ignore_next <<- TRUE
+      map_click_enabled <<- TRUE
+    })
+
+    observeEvent(input$climr_draw_new_feature, {
+      sg$add_draw_poly(input$climr_draw_new_feature)
+    })
+
+    observeEvent(input$climr_click, {
+      if (map_click_ignore_next) {map_click_ignore_next <<- FALSE; return()}
+      if (!map_click_enabled) return()
+      pos <- input$climr_click
+      sg$add_point(pos$lat, pos$lng)
+    })
+
+    observeEvent(input$sg_remove, {
+      sg$rm(input$sg_remove)
+    })
     
 # Climate layers ----
     
