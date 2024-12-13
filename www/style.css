@@ -8,6 +8,17 @@ div.outer {
   padding: 0;
 }
 
+div.outer2 {
+  position: fixed;
+  top: 60px;
+  left: 4px;
+  right: 4px;
+  bottom: 60px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 8px;
+}
+
 footer.footer {
   position: absolute;
   left: 0;

@@ -75,7 +75,7 @@ l <- leaflet::leaflet() |>
   ) |>
   leaflet::addLayersControl(
     baseGroups = c("Light", "Dark", "Satellite", "OpenStreetMap", "Hillshade"),
-    overlayGroups = c("User features", "Labels", "WNA BEC"),
+    overlayGroups = c("Labels", "WNA BEC"),
     position = "topright"
   ) |>
   leaflet::setView(lng = -100, lat = 50, zoom = 5) |>
@@ -118,15 +118,17 @@ shiny::shinyApp(
           shiny::absolutePanel(
             top = "204px",
             right = "10px",
-            shiny::fileInput("upload", "Upload file or geometry")
+            shiny::fileInput("upload", "Upload geometry or raster file")
           )
         )
       ),
       shiny::navbarMenu(
         "Data",
         "Locations",
-        shiny::tabPanel(title = "Points",
-          DT::DTOutput(outputId = "points_dt")
+        shiny::tabPanel(title = "Geometry",
+          shiny::div(class="outer2",
+            DT::DTOutput(outputId = "geom_dt")
+          )
         )
       ),
       shiny::navbarMenu(
@@ -183,12 +185,14 @@ shiny::shinyApp(
     ## Map click logic, on click add point
     observeEvent(input$climr_draw_start, map_click_enabled <<- FALSE)
     observeEvent(input$climr_draw_stop, {
-      if (input$climr_draw_stop$feature_type %in% c("rectangle", "circle")) map_click_ignore_next <<- TRUE
       map_click_enabled <<- TRUE
     })
 
     observeEvent(input$climr_draw_new_feature, {
-      sg$add_draw_poly(input$climr_draw_new_feature)
+      poly <-input$climr_draw_new_feature
+      sg$add_draw_poly(poly)
+      map_click_ignore_next <<- TRUE
+      refreshDT()
     })
 
     observeEvent(input$climr_click, {
@@ -196,11 +200,41 @@ shiny::shinyApp(
       if (!map_click_enabled) return()
       pos <- input$climr_click
       sg$add_point(pos$lat, pos$lng)
+      refreshDT()
     })
 
     observeEvent(input$sg_remove, {
       sg$rm(input$sg_remove)
+      refreshDT()
     })
+    
+    refreshDT <- function() {
+      output$geom_dt <- DT::renderDT(server = TRUE, {
+        gdt <- sg$get()
+        gdt$wkt[nchar(gdt$wkt) > 90] <- paste0(substr(gdt$wkt[nchar(gdt$wkt) > 90], 1, 87), "...")
+        gdt$action <- vapply(gdt$id, \(id) {
+          shiny::actionLink(
+            "sg_remove_%s" |> sprintf(id),
+            "remove [\U274C]",
+            onclick = 'Shiny.setInputValue(\"sg_remove\", %s, {priority: \"event\"})' |> sprintf(id)
+          ) |>
+            as.character()
+        }, character(1))
+        DT::datatable(gdt, rownames = FALSE, escape = FALSE, options = list(
+          rowCallback = DT::JS("
+            function(row, data, index) {
+              if (data[3] === \"map_click\") {
+                $(row).addClass(\"table-primary\");
+              } else if (data[3] === \"map_draw\") {
+                $(row).addClass(\"table-warning\");
+              }
+            }
+          ")
+        ))
+      })
+    }
+
+    observeEvent(input$upload, {})
     
 # Climate layers ----
     

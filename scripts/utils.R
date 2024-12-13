@@ -131,32 +131,32 @@ session_geometry <- function(mp) {
     source = character()
   )
 
-  del_popup <- function(id) {
+  rem_popup <- function(id) {
     shiny::actionButton(
       "sg_remove_%s" |> sprintf(id),
-      "Remove",
-      class = "btn btn-danger action-button",
+      "Remove:%s" |> sprintf(id),
+      class = "btn btn-sm btn-danger action-button",
       onclick = 'Shiny.setInputValue(\"sg_remove\", %s, {priority: \"event\"})' |> sprintf(id)
     ) |> 
       as.character()
   }
-  
+
   update_map_marker <- function(sg) {
-    fg <- sg |> dplyr::filter(group == "sg_marker")
+    fg <- sg |> dplyr::filter(group == "marker")
     mp |> leaflet::clearGroup("sg_marker")
     if (nrow(fg)) {
       d <- terra::vect()
       mp |>leaflet::addAwesomeMarkers(
         data = terra::vect(fg[["wkt"]]),
         group = "sg_marker",
-        popup = lapply(fg[["id"]], del_popup),
+        popup = lapply(fg[["id"]], rem_popup),
         icon = default_icon
       )
     }
   }
 
   update_map_shape <- function(sg) {
-    fg <- sg |> dplyr::filter(group == "sg_shape")
+    fg <- sg |> dplyr::filter(group == "shape")
     mp |> leaflet::clearGroup("sg_shape") |>
       leaflet.extras::removeDrawToolbar(clearFeatures = TRUE) |>
       default_draw_tool()
@@ -165,7 +165,7 @@ session_geometry <- function(mp) {
       mp |>leaflet::addPolygons(
         data = terra::vect(fg[["wkt"]]),
         group = "sg_shape",
-        popup = lapply(fg[["id"]], del_popup),
+        popup = lapply(fg[["id"]], rem_popup),
         fillColor = "#fcba19",
         color = "#036",
         opacity = 0.8,
@@ -182,28 +182,37 @@ session_geometry <- function(mp) {
     g <- dplyr::filter(sg, id == rid)[["group"]]
     sg <<- dplyr::filter(sg, id != rid)
     switch(g,
-      "sg_marker" = update_map_marker(sg),
-      "sg_shape" = update_map_shape(sg)
+      "marker" = update_map_marker(sg),
+      "shape" = update_map_shape(sg)
     )
   }
 
   sg_methods <- list(
     add_point = function(lat,lng) {
        new_p <- "POINT (%s %s)" |> sprintf(lng, lat)
-       sg <<- push(new_p, "sg_marker", "map_click")
+       sg <<- push(new_p, "marker", "map_click")
        update_map_marker(sg)
     },
     add_draw_poly = function(poly) {
       ft <- poly[["properties"]][["feature_type"]]
       if (ft %in% c("polygon","rectangle")) {
-        new_p <- paste0("POLYGON ((", paste(lapply(poly[["geometry"]][["coordinates"]][[1]], \(x) unlist(x) |> paste(collapse = " ")), collapse = ","), "))")
+        new_p <- paste0(
+          "POLYGON ((",
+            paste(
+              lapply(
+                poly[["geometry"]][["coordinates"]][[1]],
+                \(x) unlist(x) |> paste(collapse = " ")
+              ),
+            collapse = ","),
+          "))"
+        )
       } else if (ft == "circle") {
         new_p <- do.call(sprintf, c("POINT (%s %s)", poly$geometry$coordinates)) |>
           terra::vect(crs = "EPSG:4326") |>
           terra::buffer(poly$properties$radius) |>
           terra::geom(wkt = TRUE)
       }
-      sg <<- push(new_p, "sg_shape", "map_draw")
+      sg <<- push(new_p, "shape", "map_draw")
       update_map_shape(sg)
     },
     add_rast = function(r) {
