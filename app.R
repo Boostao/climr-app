@@ -1,26 +1,20 @@
 
 # Setup ----
+suppressPackageStartupMessages({
+  library(archive)
+  library(bslib)
+  library(data.table)
+  library(DT)
+  library(htmltools)
+  library(leaflet.extras)
+  library(leaflet)
+  library(shiny)
+  library(terra)
+  source("scripts/utils.R", local = TRUE)
+})
 
-library(shiny)
-library(leaflet)
-library(leaflet.extras)
-library(terra)
-library(tibble)
-library(dplyr)
-library(DT)
-
-source("scripts/utils.R")
-
-# Data source poll ----
-
-# precipitation <- lapply(1L:90L, function(i) {
-#   f <- \() sprintf("%sT06Z_MSC_HRDPA_APCP-Accum24h_Sfc_RLatLon0.0225_PT0H.tif", format(Sys.Date()-i+1L, "%Y%m%d"))
-#   dt_prep("model_hrdpa/2.5km/06", f, terra::rast)
-# })
-# pcols <- local({
-#   z <- rev(terra:::.default.pal()) |> grDevices::col2rgb()
-#   grDevices::rgb(red = z[1,], green = z[2,], blue = z[3,], maxColorValue = 255, alpha = (seq_along(z[1,]) - 1) * 0.91 / 100 * 255)
-# })
+# Shiny options
+options(shiny.maxRequestSize = 1000 * 1024^2)
 
 # MapBox values
 mbtk <- Sys.getenv("BCGOV_MAPBOX_TOKEN")
@@ -133,8 +127,9 @@ shiny::shinyApp(
       ),
       shiny::navbarMenu(
         "About",
-        "----",
-        shiny::tabPanel("How to use")
+        "How to use",
+        shiny::tabPanel("Map"),
+        shiny::tabPanel("Date")
       ),
       header = list(
         shiny::includeCSS("www/style.css"),
@@ -175,69 +170,36 @@ shiny::shinyApp(
 # Shiny server ----
 
   server = function(input, output, session) {
+    
+    session$allowReconnect("force")
 
     output$climr <- leaflet::renderLeaflet(l)
-    map_proxy <- leaflet::leafletProxy('climr')
-    sg <- session_geometry(map_proxy)
-    map_click_enabled <- TRUE
-    map_click_ignore_next <- FALSE
 
-    ## Map click logic, on click add point
-    observeEvent(input$climr_draw_start, map_click_enabled <<- FALSE)
-    observeEvent(input$climr_draw_stop, {
-      map_click_enabled <<- TRUE
-    })
+    source("scripts/geometry.R", local = TRUE)
+    sg <- session_geometry()
 
-    observeEvent(input$climr_draw_new_feature, {
-      poly <-input$climr_draw_new_feature
-      sg$add_draw_poly(poly)
-      map_click_ignore_next <<- TRUE
-      refreshDT()
-    })
-
-    observeEvent(input$climr_click, {
-      if (map_click_ignore_next) {map_click_ignore_next <<- FALSE; return()}
-      if (!map_click_enabled) return()
-      pos <- input$climr_click
-      sg$add_point(pos$lat, pos$lng)
-      refreshDT()
-    })
-
-    observeEvent(input$sg_remove, {
-      sg$rm(input$sg_remove)
-      refreshDT()
-    })
-    
-    refreshDT <- function() {
-      output$geom_dt <- DT::renderDT(server = TRUE, {
-        gdt <- sg$get()
-        gdt$wkt[nchar(gdt$wkt) > 90] <- paste0(substr(gdt$wkt[nchar(gdt$wkt) > 90], 1, 87), "...")
-        gdt$action <- vapply(gdt$id, \(id) {
-          shiny::actionLink(
-            "sg_remove_%s" |> sprintf(id),
-            "remove [\U274C]",
-            onclick = 'Shiny.setInputValue(\"sg_remove\", %s, {priority: \"event\"})' |> sprintf(id)
-          ) |>
-            as.character()
-        }, character(1))
-        DT::datatable(gdt, rownames = FALSE, escape = FALSE, options = list(
-          rowCallback = DT::JS("
-            function(row, data, index) {
-              if (data[3] === \"map_click\") {
-                $(row).addClass(\"table-primary\");
-              } else if (data[3] === \"map_draw\") {
-                $(row).addClass(\"table-warning\");
-              }
-            }
-          ")
-        ))
-      })
-    }
-
-    observeEvent(input$upload, {})
+    ## Map events
+    observeEvent(input$climr_draw_start, sg$add_point_enabled(FALSE))
+    observeEvent(input$climr_draw_stop, sg$add_point_enabled(TRUE))
+    observeEvent(input$climr_draw_new_feature, sg$add_draw_poly(input$climr_draw_new_feature))
+    observeEvent(input$climr_click, sg$add_point(input$climr_click$lat, input$climr_click$lng))
+    observeEvent(input$upload, sg$add_file(input$upload))
+    observeEvent(input$sg_remove, sg$rm(input$sg_remove))
+    observeEvent(input$sg_view, sg$view(input$sg_view))
     
 # Climate layers ----
-    
+
+    # Data source poll ----
+
+# precipitation <- lapply(1L:90L, function(i) {
+#   f <- \() sprintf("%sT06Z_MSC_HRDPA_APCP-Accum24h_Sfc_RLatLon0.0225_PT0H.tif", format(Sys.Date()-i+1L, "%Y%m%d"))
+#   dt_prep("model_hrdpa/2.5km/06", f, terra::rast)
+# })
+# pcols <- local({
+#   z <- rev(terra:::.default.pal()) |> grDevices::col2rgb()
+#   grDevices::rgb(red = z[1,], green = z[2,], blue = z[3,], maxColorValue = 255, alpha = (seq_along(z[1,]) - 1) * 0.91 / 100 * 255)
+# })
+
     # lyr_added <- list()
     # current_date_idx <- list()
     

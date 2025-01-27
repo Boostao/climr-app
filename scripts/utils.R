@@ -1,3 +1,4 @@
+# App Theme ----
 bcgov_theme <- function(action = c("install","remove")) {
   action <- match.arg(action)
 
@@ -28,21 +29,7 @@ if (!"bcgov" %in% bslib::bootswatch_themes()) {
   bcgov_theme("install")
 }
 
-latlontopoly <- function(latlon) {
-  matrix(latlon, ncol = 2, byrow = TRUE) |>
-    as.data.frame() |>
-    sf::st_as_sf(coords = c(2,1), crs = sf::st_crs(4326)) |>
-    sf::st_combine() |>
-    sf::st_cast("POLYGON")
-}
-
-boundstopoly <- function(b) {
-  if (abs(b$west) > 180 | abs(b$east) > 180 | abs(b$north) > 90 | abs(b$south) > 90) return(NULL)
-  res <- sf::st_polygon(list(rbind(c(b$west, b$north),c(b$east, b$north),c(b$east, b$south),c(b$west, b$south),c(b$west, b$north)))) |>
-    sf::st_sfc()
-  res <- sf::st_set_crs(res, sf::st_crs(4326))
-  res
-}
+# Map tiles provider for BGC + vector tiles ----
 
 ##javascript source
 wna_tileserver <- "https://tileserver.thebeczone.ca/data/WNA_MAP/{z}/{x}/{y}.pbf"
@@ -122,111 +109,31 @@ default_draw_tool <- function(mp) {
 
 default_icon <- leaflet::makeAwesomeIcon("record", markerColor = "darkblue", iconColor = "#fcba19")
 
-session_geometry <- function(mp) {
+report_msg <- function(msgs, type = c("info", "danger")) {
 
-  sg <- tibble::tibble(
-    id = integer(),
-    wkt = character(),
-    group = character(),
-    source = character()
+  type <- match.arg(type)
+
+  hd <- c(
+    "info" = "Climr info:",
+    "danger" = "Climr encountered problems:"
   )
 
-  rem_popup <- function(id) {
-    shiny::actionButton(
-      "sg_remove_%s" |> sprintf(id),
-      "Remove:%s" |> sprintf(id),
-      class = "btn btn-sm btn-danger action-button",
-      onclick = 'Shiny.setInputValue(\"sg_remove\", %s, {priority: \"event\"})' |> sprintf(id)
-    ) |> 
-      as.character()
-  }
-
-  update_map_marker <- function(sg) {
-    fg <- sg |> dplyr::filter(group == "marker")
-    mp |> leaflet::clearGroup("sg_marker")
-    if (nrow(fg)) {
-      d <- terra::vect()
-      mp |>leaflet::addAwesomeMarkers(
-        data = terra::vect(fg[["wkt"]]),
-        group = "sg_marker",
-        popup = lapply(fg[["id"]], rem_popup),
-        icon = default_icon
-      )
-    }
-  }
-
-  update_map_shape <- function(sg) {
-    fg <- sg |> dplyr::filter(group == "shape")
-    mp |> leaflet::clearGroup("sg_shape") |>
-      leaflet.extras::removeDrawToolbar(clearFeatures = TRUE) |>
-      default_draw_tool()
-    if (nrow(fg)) {
-      d <- terra::vect()
-      mp |>leaflet::addPolygons(
-        data = terra::vect(fg[["wkt"]]),
-        group = "sg_shape",
-        popup = lapply(fg[["id"]], rem_popup),
-        fillColor = "#fcba19",
-        color = "#036",
-        opacity = 0.8,
-        weight = 2
-      )
-    }
-  }
-
-  push <- function(new, l, s) {
-    rbind(sg, tibble::tibble(id = max(c(sg$id,0)) + 1L, wkt = new, group = l, source = s))
-  }
-
-  rem <- function(rid) {
-    g <- dplyr::filter(sg, id == rid)[["group"]]
-    sg <<- dplyr::filter(sg, id != rid)
-    switch(g,
-      "marker" = update_map_marker(sg),
-      "shape" = update_map_shape(sg)
+  msgs_html <- tags$div(
+    class = "alert alert-%s" |> sprintf(type),
+    tags$h4(class = "alert-heading", hd[type]),
+    tags$ul(
+      lapply(msgs, function(msg) {
+        tags$li(msg)
+      })
     )
-  }
+  )  
+  # Show modal with problems
+  shiny::showModal(
+    shiny::modalDialog(
+      msgs_html,
+      size = "xl",
+      fade = FALSE,
+      easyClose = TRUE
+  ))
 
-  sg_methods <- list(
-    add_point = function(lat,lng) {
-       new_p <- "POINT (%s %s)" |> sprintf(lng, lat)
-       sg <<- push(new_p, "marker", "map_click")
-       update_map_marker(sg)
-    },
-    add_draw_poly = function(poly) {
-      ft <- poly[["properties"]][["feature_type"]]
-      if (ft %in% c("polygon","rectangle")) {
-        new_p <- paste0(
-          "POLYGON ((",
-            paste(
-              lapply(
-                poly[["geometry"]][["coordinates"]][[1]],
-                \(x) unlist(x) |> paste(collapse = " ")
-              ),
-            collapse = ","),
-          "))"
-        )
-      } else if (ft == "circle") {
-        new_p <- do.call(sprintf, c("POINT (%s %s)", poly$geometry$coordinates)) |>
-          terra::vect(crs = "EPSG:4326") |>
-          terra::buffer(poly$properties$radius) |>
-          terra::geom(wkt = TRUE)
-      }
-      sg <<- push(new_p, "shape", "map_draw")
-      update_map_shape(sg)
-    },
-    add_rast = function(r) {
-
-    },
-    add_file = function(f) {
-
-    },
-    get = function() {
-      return(sg)
-    },
-    rm = function(rid) {
-      rem(rid)
-    }
-  )
-  return(sg_methods)
 }
