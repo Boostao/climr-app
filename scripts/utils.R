@@ -31,6 +31,47 @@ if (!"bcgov" %in% bslib::bootswatch_themes()) {
 
 # Map tiles provider for BGC + vector tiles ----
 
+climatena_tileserver <- "http://143.198.35.16:8080"
+indexcna <- jsonlite::fromJSON("%s/index.json" |> sprintf(climatena_tileserver), simplifyDataFrame = FALSE)
+climatena <- climatelabels <- vapply(indexcna, `[[`, character(1), "name")
+names(indexcna) <- climatena
+season <- c("wt" = " - Winter", "sp" = " - Spring", "sm" = " - Summer", "at" = " - Autumn")
+month <- setNames(paste0(" - ", month.name[1:12]), sprintf("%02d", 1:12))
+climatevar <- c(
+  "AHM" = "annual heat-moisture index (MAT+10)/(MAP/1000))",
+  "bFFP" = "Day of the year on which the Frost-Free Period begins",
+  "CMD" = "Hargreaves climatic moisture deficit (mm)",
+  "CMI" = "Hogg’s climate moisture index (mm)",
+  "DD_0" = "degree-days below 0°C, chilling degree-days",
+  "DD_18" = "degree-days below 18°C, heating degree-days",
+  "DD18" = "degree-days above 18°C, cooling degree-days",
+  "DD1040" = "degree-days above 10°C and below 40°C",
+  "DD5" = "degree-days above 5°C, growing degree-days",
+  "eFFP" = "Day of the year on which the Frost-Free Period ends",
+  "EMT" = "extreme minimum temperature over 30 years (°C)",
+  "Eref" = "Hargreaves reference evaporation (mm)",
+  "FFP" = "frost-free period",
+  "MAP" = "mean annual precipitation (mm)",
+  "MAT" = "mean annual temperature (°C)",
+  "MCMT" = "mean coldest month temperature (°C)",
+  "MSP" = "mean annual summer (May to Sept.) precipitation (mm)",
+  "MWMT" = "mean warmest month temperature (°C)",
+  "NFFD" = "the number of frost-free days",
+  "PAS" = "precipitation as snow (mm).",
+  "PPT" = "precipitation (mm)",
+  "Rad" = "solar radiation (MJ m-2 d-1)",
+  "RH" = "mean relative humidity (%)",
+  "SHM" = "summer heat-moisture index ((MWMT)/(MSP/1000))",
+  "Tave" = "mean temperatures (°C)",
+  "TD" = "temperature difference between MWMT and MCMT, or continentality (°C)",
+  "Tmax" = "maximum mean temperatures (°C)",
+  "Tmin" = "minimum mean temperatures (°C)"
+)
+for (l in names(climatevar)) { climatelabels <- gsub("^%s" |> sprintf(l), sprintf("Annual - %s", climatevar[l]), climatelabels)}
+for (l in names(season)) { climatelabels <- gsub("^Annual([^_]+)_%s$" |> sprintf(l), sprintf("Seasonal\\1%s", season[l]), climatelabels)}
+for (l in names(month)) { climatelabels <- gsub("^Annual([^_]+)_?%s$" |> sprintf(l), sprintf("Monthly\\1%s", month[l]), climatelabels)}
+climatena <- setNames(climatena, climatelabels)
+
 ##javascript source
 wna_tileserver <- "https://tileserver.thebeczone.ca/data/WNA_MAP/{z}/{x}/{y}.pbf"
 wna_tilelayer <- "WNA_MAP"
@@ -50,6 +91,10 @@ plugins <- {
 registerPlugin <- function(map, plugin) {
   map$dependencies <- c(map$dependencies, list(plugin))
   map
+}
+
+add_climate_na <- function(map) {
+
 }
 
 add_wna <- function(map) {

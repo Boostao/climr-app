@@ -25,3 +25,20 @@ footer.footer {
   right: 0;
   bottom: 0;
 }
+
+div.input-control {
+  top: 204px;
+  right: 10px;
+  background: #FFFFFF88;
+  padding: 10px;
+  border: 1px var(--bs-bcgold) solid;
+  border-radius: 5px;
+}
+
+div.input-control .control-label {
+  font-size: 0.85rem;
+}
+
+.selectize-dropdown, .selectize-input, .selectize-input input {
+  font-size: 0.75rem !important;
+}
