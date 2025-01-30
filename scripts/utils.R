@@ -29,48 +29,81 @@ if (!"bcgov" %in% bslib::bootswatch_themes()) {
   bcgov_theme("install")
 }
 
-# Map tiles provider for BGC + vector tiles ----
-
-climatena_tileserver <- "http://143.198.35.16:8080"
-indexcna <- jsonlite::fromJSON("%s/index.json" |> sprintf(climatena_tileserver), simplifyDataFrame = FALSE)
-climatena <- climatelabels <- vapply(indexcna, `[[`, character(1), "name")
-names(indexcna) <- climatena
-season <- c("wt" = " - Winter", "sp" = " - Spring", "sm" = " - Summer", "at" = " - Autumn")
-month <- setNames(paste0(" - ", month.name[1:12]), sprintf("%02d", 1:12))
-climatevar <- c(
-  "AHM" = "annual heat-moisture index (MAT+10)/(MAP/1000))",
-  "bFFP" = "Day of the year on which the Frost-Free Period begins",
-  "CMD" = "Hargreaves climatic moisture deficit (mm)",
-  "CMI" = "Hogg’s climate moisture index (mm)",
-  "DD_0" = "degree-days below 0°C, chilling degree-days",
-  "DD_18" = "degree-days below 18°C, heating degree-days",
-  "DD18" = "degree-days above 18°C, cooling degree-days",
-  "DD1040" = "degree-days above 10°C and below 40°C",
-  "DD5" = "degree-days above 5°C, growing degree-days",
-  "eFFP" = "Day of the year on which the Frost-Free Period ends",
-  "EMT" = "extreme minimum temperature over 30 years (°C)",
-  "Eref" = "Hargreaves reference evaporation (mm)",
-  "FFP" = "frost-free period",
-  "MAP" = "mean annual precipitation (mm)",
-  "MAT" = "mean annual temperature (°C)",
-  "MCMT" = "mean coldest month temperature (°C)",
-  "MSP" = "mean annual summer (May to Sept.) precipitation (mm)",
-  "MWMT" = "mean warmest month temperature (°C)",
-  "NFFD" = "the number of frost-free days",
-  "PAS" = "precipitation as snow (mm).",
+# Tiles source
+climr_tif_url <- readLines(Sys.getenv("CLIMR_TIF_URL")) |>
+  {\(x) gregexec('href="([A-Za-z0-9][^"]*)"', text = x) |> regmatches(x, m = _)}() |>
+    lapply(tail, 1) |>
+      unlist(recursive = TRUE) |>
+        file.path(Sys.getenv("CLIMR_TIF_URL"), p = _)
+climr_tif_labels <- basename(climr_tif_url) |> tools::file_path_sans_ext()
+seasons <- c("wt" = "Winter", "sp" = "Spring", "sm" = "Summer", "at" = "Autumn")
+months <- setNames(month.name, sprintf("%02d", 1:12))
+climatevars <- c(
+  "Tave" = "mean temperatures (°C)",
+  "Tmax" = "maximum mean temperatures (°C)",
+  "Tmin" = "minimum mean temperatures (°C)",
   "PPT" = "precipitation (mm)",
   "Rad" = "solar radiation (MJ m-2 d-1)",
-  "RH" = "mean relative humidity (%)",
-  "SHM" = "summer heat-moisture index ((MWMT)/(MSP/1000))",
-  "Tave" = "mean temperatures (°C)",
+  "MAT" = "mean annual temperature (°C)",
+  "MWMT" = "mean warmest month temperature (°C)",
+  "MCMT" = "mean coldest month temperature (°C)",
   "TD" = "temperature difference between MWMT and MCMT, or continentality (°C)",
-  "Tmax" = "maximum mean temperatures (°C)",
-  "Tmin" = "minimum mean temperatures (°C)"
+  "MAP" = "mean annual precipitation (mm)",
+  "MSP" = "mean annual summer (May to Sept.) precipitation (mm)",
+  "AHM" = "annual heat-moisture index (MAT+10)/(MAP/1000))",
+  "SHM" = "summer heat-moisture index ((MWMT)/(MSP/1000))",
+  "DD_0" = "degree-days below 0°C, chilling degree-days",
+  "DD5" = "degree-days above 5°C, growing degree-days",
+  "DD_18" = "degree-days below 18°C, heating degree-days",
+  "DD18" = "degree-days above 18°C, cooling degree-days",
+  "NFFD" = "the number of frost-free days",
+  "FFP" = "frost-free period",
+  "bFFP" = "Day of the year on which the Frost-Free Period begins",
+  "eFFP" = "Day of the year on which the Frost-Free Period ends",
+  "PAS" = "precipitation as snow (mm).",
+  "EMT" = "extreme minimum temperature over 30 years (°C)",
+  "EXT" = "extreme maximum temperature over 30 years (°C)",
+  "CMD" = "Hargreaves climatic moisture deficit (mm)",
+  "CMI" = "Hogg’s climate moisture index (mm)",
+  "DD1040" = "degree-days above 10°C and below 40°C",
+  "Eref" = "Hargreaves reference evaporation (mm)",
+  "RH" = "mean relative humidity (%)"
 )
-for (l in names(climatevar)) { climatelabels <- gsub("^%s" |> sprintf(l), sprintf("Annual - %s", climatevar[l]), climatelabels)}
-for (l in names(season)) { climatelabels <- gsub("^Annual([^_]+)_%s$" |> sprintf(l), sprintf("Seasonal\\1%s", season[l]), climatelabels)}
-for (l in names(month)) { climatelabels <- gsub("^Annual([^_]+)_?%s$" |> sprintf(l), sprintf("Monthly\\1%s", month[l]), climatelabels)}
-climatena <- setNames(climatena, climatelabels)
+season_idx <- grep(paste0("_", names(seasons), "$", collapse = "|"), climr_tif_labels)
+monthly_idx <- grep(paste0("_?", names(months), "$", collapse = "|"), climr_tif_labels)
+annual_idx <- setdiff(seq_along(climr_tif_labels), c(season_idx, monthly_idx))
+climr_tif <- list()
+climr_tif[["Annual"]] <- {
+  setNames(climr_tif_url[annual_idx], climatevars[climr_tif_labels[annual_idx]])
+}
+climr_tif[["Seasonal"]] <- {
+  setNames(climr_tif_url[season_idx], {
+    s1 <- strsplit(
+      climr_tif_labels[season_idx],
+      paste0("_", names(seasons), "$", collapse = "|")
+    ) |> unlist()
+    s2 <- strsplit(
+      climr_tif_labels[season_idx],
+      paste0("^", unique(s1), "_", collapse = "|")
+    ) |> lapply(tail, 1) |> unlist()
+    paste(climatevars[s1], seasons[s2], sep = " - ")
+  })
+}
+climr_tif[["Monthly"]] <- {
+  setNames(climr_tif_url[monthly_idx], {
+    s1 <- strsplit(
+      climr_tif_labels[monthly_idx],
+      paste0("_?", names(months), "$", collapse = "|")
+    ) |> unlist()
+    s2 <- strsplit(
+      climr_tif_labels[monthly_idx],
+      paste0("^", unique(s1), "_?", collapse = "|")
+    ) |> lapply(tail, 1) |> unlist()
+    paste(climatevars[s1], months[s2], sep = " - ")
+  })
+}
+
+# Map tiles provider for BGC + vector tiles ----
 
 ##javascript source
 wna_tileserver <- "https://tileserver.thebeczone.ca/data/WNA_MAP/{z}/{x}/{y}.pbf"
@@ -182,3 +215,32 @@ report_msg <- function(msgs, type = c("info", "danger")) {
   ))
 
 }
+
+generate_pal_img <- function(palette, w = 256, h = 10) {
+  # Generate color palette
+  colors <- grDevices::hcl.colors(w, palette = palette)
+  # SVG string
+  svg_string <- paste0(collapse = "",
+    '<svg width="', w,'" height="1" xmlns="http://www.w3.org/2000/svg">',
+    paste0('<rect x="', seq_along(colors),'" y="0" width="1" height="1" fill="', colors,'" />', collapse = ""),
+    '</svg>'
+  )
+
+  tmp_svg <- tempfile(fileext = ".svg")
+  on.exit(unlink(tmp_svg), add = TRUE)
+
+  writeLines(svg_string, tmp_svg)
+  
+  # Convert SVG to PNG in memory
+  png_data <- rsvg::rsvg(tmp_svg)
+  
+  # Convert PNG data to WebP
+  webp_data <- webp::write_webp(png_data, quality = 100)
+  
+  # Encode WebP data to base64
+  base64_data <- base64enc::base64encode(webp_data)
+  
+  # Construct the base64 image string
+  base64_image <- paste0("<img height=", h," width=", w," src=\"data:image/webp;base64,", base64_data, "\" alt=\"", palette,"\">")
+}
+pals <- setNames(grDevices::hcl.pals(), vapply(grDevices::hcl.pals(), generate_pal_img, character(1)))

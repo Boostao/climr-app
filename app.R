@@ -11,6 +11,10 @@ suppressPackageStartupMessages({
   library(shiny)
   library(terra)
   library(jsonlite)
+  library(grDevices)
+  library(webp)
+  library(rsvg)
+  library(base64enc)
   source("scripts/utils.R", local = TRUE)
 })
 
@@ -112,9 +116,17 @@ shiny::shinyApp(
           leaflet::leafletOutput("climr", width = "100%", height = "100%"),
           shiny::absolutePanel(
             class = "input-control",
-            shiny::selectInput("climatevar", "Climate overlay (1981-2010 Hist. norm.)", choices = c("None" = "NONE", climatena)),
-            shiny::sliderInput("opacity", "Overlay opacity", value = 80, min = 0, max = 100, step = 1, ticks = FALSE),
-            shiny::fileInput("upload", "Upload geometry or raster file")
+            shiny::fileInput("upload", "Upload geometry or raster file"),
+            shiny::actionButton("toggleOverlayInputs", "Climate Overlay", class = "btn btn-info btn-sm", `data-bs-toggle` = "collapse", `data-bs-target` = "#collapseOverlayInputs"),
+            shiny::div(class = "collapse", id = "collapseOverlayInputs",
+              shiny::radioButtons("temporality", "Temporality", c("Annual", "Seasonal", "Monthly"), inline = TRUE),
+              shiny::selectInput("climatevar", "Measurement (1981-2010 Hist. norm.)", choices = c("None" = "NONE", climr_tif[["Annual"]])),
+              shiny::selectizeInput("palette", "Overlay color palette", choices = pals, selected = "Plasma",
+                options = list(render = I('{option: function(item, escape) {return item.label;},item: function(item, escape) {return item.label;}}'))
+              ),
+              shiny::sliderInput("opacity", "Overlay opacity", value = 80, min = 0, max = 100, step = 1, ticks = FALSE),
+              shiny::actionButton("downloadoverlay", "Download Overlay", class = "btn btn-secondary btn-sm", disabled = TRUE)
+            )
           )
         )
       ),
@@ -188,20 +200,26 @@ shiny::shinyApp(
     observeEvent(input$upload, sg$add_file(input$upload))
     observeEvent(input$sg_remove, sg$rm(input$sg_remove))
     observeEvent(input$sg_view, sg$view(input$sg_view))
+    observeEvent(input$temporality, {
+      shiny::updateSelectInput(inputId = "climatevar", choices = c("None" = "NONE", climr_tif[[input$temporality]]))
+    })
     observe({
       mp <- leaflet::leafletProxy("climr")
       mp |> leaflet::removeTiles("climate")
+      shiny::updateActionButton(inputId = "downloadoverlay", disabled = TRUE)
       if ("NONE" %in% input$climatevar | 0 == input$opacity) return()
-      t <- indexcna[[input$climatevar]]
-      mp |> leaflet::addTiles(
-        urlTemplate = t$tiles,
-        layerId = "climate",
-        group = "Climate",
-        options = leaflet::tileOptions(
-          maxNativeZoom = t$maxzoom,
-          minZoom = t$minzoom,
-          opacity = input$opacity / 100
-        )
+      shiny::updateActionButton(inputId = "downloadoverlay", disabled = FALSE)
+      mp |> leafem::addGeotiff(      
+        file = input$climatevar,
+        group = "climate",
+        project = FALSE,
+        opacity = input$opacity / 100,
+        colorOptions = leafem::colorOptions(
+          palette = grDevices::hcl.colors(256, palette = input$palette),
+          na.color = "transparent"
+        ),
+        imagequery = TRUE,
+        autozoom = FALSE
       )
     })
     
