@@ -8,10 +8,11 @@ name: climrapp
 
 jobs:
   climr:
-  runs-on: self-hosted
-  steps:
-    - uses: actions/checkout@main
-    - run: |
-        rm -R /srv/shiny-server/climr-app
-        cp -R ../climr-app /srv/shiny-server/
-        touch /srv/shiny-server/climr-app/restart.txt
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@main
+      - name: copy app over
+        run: |
+          rm -R /srv/shiny-server/climr-app
+          cp -R ../climr-app /srv/shiny-server/
+          touch /srv/shiny-server/climr-app/restart.txt
