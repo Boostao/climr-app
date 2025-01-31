@@ -2,21 +2,17 @@
 # Setup ----
 suppressPackageStartupMessages({
   library(archive)
-  library(base64enc)
   library(bslib)
   library(data.table)
   library(DT)
-  library(grDevices)
   library(htmltools)
   library(htmlwidgets)
   library(jsonlite)
   library(leafem)
   library(leaflet.extras)
   library(leaflet)
-  library(rsvg)
   library(shiny)
   library(terra)
-  library(webp)
   source("scripts/utils.R", local = TRUE)
 })
 
@@ -27,6 +23,8 @@ options(shiny.maxRequestSize = 1000 * 1024^2)
 mbtk <- Sys.getenv("BCGOV_MAPBOX_TOKEN")
 mblbstyle <- Sys.getenv("BCGOV_MAPBOX_LABELS_STYLE")
 mbhsstyle <- Sys.getenv("BCGOV_MAPBOX_HILLSHADE_STYLE")
+
+pals <- readRDS("scripts/pals.rds")
 
 # Base map ----
 l <- leaflet::leaflet() |>
@@ -123,7 +121,7 @@ shiny::shinyApp(
             shiny::div(class = "collapse", id = "collapseOverlayInputs",
               shiny::radioButtons("temporality", "Temporality", c("Annual", "Seasonal", "Monthly"), inline = TRUE),
               shiny::selectInput("climatevar", "Measurement (1981-2010 Hist. norm.)", choices = c("None" = "NONE", climr_tif[["Annual"]])),
-              shiny::selectizeInput("palette", "Overlay color palette", choices = pals, selected = "Plasma",
+              shiny::selectizeInput("palette", "Overlay color palette", choices = pals$select, selected = "Plasma",
                 options = list(render = I('{option: function(item, escape) {return item.label;},item: function(item, escape) {return item.label;}}'))
               ),
               shiny::sliderInput("opacity", "Overlay opacity", value = 80, min = 0, max = 100, step = 1, ticks = FALSE),
@@ -217,7 +215,7 @@ shiny::shinyApp(
         project = FALSE,
         opacity = input$opacity / 100,
         colorOptions = leafem::colorOptions(
-          palette = grDevices::hcl.colors(256, palette = input$palette),
+          palette = pals$colors[input$palette],
           na.color = "transparent"
         ),
         imagequery = TRUE,
