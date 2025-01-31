@@ -215,7 +215,7 @@ shiny::shinyApp(
         project = FALSE,
         opacity = input$opacity / 100,
         colorOptions = leafem::colorOptions(
-          palette = pals$colors[input$palette],
+          palette = pals$colors[[input$palette]],
           na.color = "transparent"
         ),
         imagequery = TRUE,
