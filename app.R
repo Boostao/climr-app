@@ -214,6 +214,7 @@ shiny::shinyApp(
       mp |> leafem::addGeotiff(      
         file = input$climatevar,
         group = "climate",
+        layerId = basename(input$climatevar) |> tools::file_path_sans_ext(),
         project = FALSE,
         opacity = input$opacity / 100,
         colorOptions = leafem::colorOptions(
