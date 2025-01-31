@@ -207,14 +207,13 @@ shiny::shinyApp(
     })
     observe({
       mp <- leaflet::leafletProxy("climr")
-      mp |> leaflet::removeTiles("climate")
+      mp |> leaflet::removeTiles("Climate")
       shiny::updateActionButton(inputId = "downloadoverlay", disabled = TRUE)
       if ("NONE" %in% input$climatevar | 0 == input$opacity) return()
       shiny::updateActionButton(inputId = "downloadoverlay", disabled = FALSE)
       mp |> leafem::addGeotiff(      
-        file = input$climatevar,
-        group = "climate",
-        layerId = basename(input$climatevar) |> tools::file_path_sans_ext(),
+        url = input$climatevar,
+        group = "Climate",
         project = FALSE,
         opacity = input$opacity / 100,
         colorOptions = leafem::colorOptions(
