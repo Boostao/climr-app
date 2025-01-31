@@ -20,4 +20,5 @@ jobs:
           Rscript -e 'pak::pak(upgrade = TRUE, pkg = readLines("pak", warn = FALSE))'
           cp -R ../climr-app /srv/shiny-server/
           touch /srv/shiny-server/climr-app/restart.txt
+          Rscript scripts/utils.R
           
