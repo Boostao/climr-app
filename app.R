@@ -53,7 +53,8 @@ l <- leaflet::leaflet() |>
     urlTemplate = paste0("https://api.mapbox.com/styles/v1/", mbhsstyle, "/tiles/{z}/{x}/{y}?access_token=", mbtk),
     attribution = '&#169; <a href="https://www.mapbox.com/feedback/">Mapbox</a>',
     options = leaflet::pathOptions(pane = "mapPane"),
-    group = "Hillshade"
+    group = "Hillshade",
+
   ) |>
   # overlay layer
   leaflet::addTiles(
@@ -62,7 +63,7 @@ l <- leaflet::leaflet() |>
     options = leaflet::pathOptions(pane = "overlayPane"),
     group = "Labels"
   ) |>
-  add_wna() |>
+  add_custom_render() |>
   # extensions
   leaflet.extras::addSearchOSM(
     options = leaflet.extras::searchOptions(
@@ -79,7 +80,9 @@ l <- leaflet::leaflet() |>
   ) |>
   leaflet::setView(lng = -100, lat = 50, zoom = 5) |>
   leaflet::addMiniMap(toggleDisplay = TRUE, minimized = TRUE) |>
-  default_draw_tool()
+  default_draw_tool() |>
+  leaflet::hideGroup(c("Labels", "WNA BEC", "Climate")) |>
+  leaflet::showGroup("Hillshade")
 
 # Shiny App ----
 
@@ -121,7 +124,7 @@ shiny::shinyApp(
             shiny::div(class = "collapse", id = "collapseOverlayInputs",
               shiny::radioButtons("temporality", "Temporality", c("Annual", "Seasonal", "Monthly"), inline = TRUE),
               shiny::selectInput("climatevar", "Measurement (1981-2010 Hist. norm.)", choices = c("None" = "NONE", climr_tif[["Annual"]])),
-              shiny::selectizeInput("palette", "Overlay color palette", choices = pals$select, selected = "Plasma",
+              shiny::selectizeInput("palette", "Overlay color palette", choices = pals$select, selected = "Roma",
                 options = list(render = I('{option: function(item, escape) {return item.label;},item: function(item, escape) {return item.label;}}'))
               ),
               shiny::sliderInput("opacity", "Overlay opacity", value = 80, min = 0, max = 100, step = 1, ticks = FALSE),
@@ -203,15 +206,17 @@ shiny::shinyApp(
     observeEvent(input$temporality, {
       shiny::updateSelectInput(inputId = "climatevar", choices = c("None" = "NONE", climr_tif[[input$temporality]]))
     })
-    observe({
+    observeEvent(input$climatevar, {
       mp <- leaflet::leafletProxy("climr")
-      mp |> leaflet::removeTiles("Climate")
+      mp |> removeTiles("val")
+      session$sendCustomMessage(type="jsCode", list(code= "$('#rasterValues-val').remove();"))
       shiny::updateActionButton(inputId = "downloadoverlay", disabled = TRUE)
       if ("NONE" %in% input$climatevar | 0 == input$opacity) return()
       shiny::updateActionButton(inputId = "downloadoverlay", disabled = FALSE)
       mp |> leafem::addGeotiff(      
         url = input$climatevar,
         group = "Climate",
+        layerId = "val",
         project = FALSE,
         opacity = input$opacity / 100,
         colorOptions = leafem::colorOptions(
@@ -219,8 +224,22 @@ shiny::shinyApp(
           na.color = "transparent"
         ),
         imagequery = TRUE,
+        imagequeryOptions = leafem::imagequeryOptions(
+          prefix = input$climatevar |> basename() |> tools::file_path_sans_ext()
+        ),
         autozoom = FALSE
-      )
+      ) |> leaflet::showGroup("Climate")
+    })
+    observeEvent(input$opacity, {
+      session$sendCustomMessage(type="updateOpacity", list(category = "image", layerId = "val", opacity = input$opacity /100))
+    })
+    observeEvent(input$palette, {
+      session$sendCustomMessage(type="updateClimatePalette", list(
+        category = "image", layerId = "val", colorOptions = leafem::colorOptions(
+          palette = pals$colors[[input$palette]],
+          na.color = "transparent"
+        )
+      ))
     })
     
   }

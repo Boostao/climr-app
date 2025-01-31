@@ -130,7 +130,7 @@ add_climate_na <- function(map) {
 
 }
 
-add_wna <- function(map) {
+add_custom_render <- function(map) {
   subzones_colours_ref <- data.table::fread("data/WNAv12_3_SubzoneCols.csv", key = "classification")
   map <- registerPlugin(map, plugins$vgplugin)
   map <- htmlwidgets::onRender(map, paste0('
@@ -171,6 +171,41 @@ add_wna <- function(map) {
         return e.properties.MAP_LABEL
       }, {sticky: true, textsize: "10px", opacity: 1});
       subzLayer.bringToFront();
+
+      var map = this;
+
+      var updateOpacity=function(message) {
+        var prefixedLayerId = map.layerManager._layerIdKey(message.category, message.layerId);
+        var layer = map.layerManager._byLayerId[prefixedLayerId];
+        if (layer.setOpacity) {
+          layer.setOpacity(message.opacity);
+        }
+      }
+
+      var updateClimatePalette=function(message) {
+        var prefixedLayerId = map.layerManager._layerIdKey(message.category, message.layerId);
+        var colorOptions = message.colorOptions;
+        var layer = map.layerManager._byLayerId[prefixedLayerId];
+        var georaster = layer.options.georaster;
+
+        const cols = colorOptions.palette;
+        let scale = chroma.scale(cols);
+        let domain = [georaster.mins[0], georaster.maxs[0]];
+        let nacol = colorOptions["na.color"];
+        pixelValuesToColorFn = values => {
+          let vals;
+          vals = values[0];
+          let clr = scale.domain(domain);
+          if (isNaN(vals) || vals === georaster.noDataValue) return nacol;
+          return clr(vals).hex();
+        };
+        layer.options.pixelValuesToColorFn = pixelValuesToColorFn;
+        layer.redraw();
+      }
+
+      Shiny.addCustomMessageHandler(\'updateOpacity\', updateOpacity);
+      Shiny.addCustomMessageHandler(\'updateClimatePalette\', updateClimatePalette);
+
     }'
   ))
   map
