@@ -15,5 +15,9 @@ jobs:
       - name: copy app over
         run: |
           rm -R /srv/shiny-server/climr-app
+          cp .Renviron ~/.Renviron
+          Rscript -e 'if (! requireNamespace("pak", quietly=TRUE)) install.packages("pak", repos = sprintf("https://r-lib.github.io/p/pak/devel/%s/%s/%s", .Platform$pkgType, R.Version()$os, R.Version()$arch))'
+          Rscript -e 'pak::pak(upgrade = TRUE, pkg = readLines("pak", warn = FALSE))'
           cp -R ../climr-app /srv/shiny-server/
           touch /srv/shiny-server/climr-app/restart.txt
+          

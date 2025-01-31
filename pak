@@ -1,0 +1,16 @@
+archive
+base64enc
+bslib
+data.table
+DT
+grDevices
+htmltools
+htmlwidgets
+jsonlite
+r-spatial/leafem
+leaflet.extras
+leaflet
+rsvg
+shiny
+terra
+webp
