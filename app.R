@@ -81,7 +81,7 @@ l <- leaflet::leaflet() |>
   leaflet::setView(lng = -100, lat = 50, zoom = 5) |>
   leaflet::addMiniMap(toggleDisplay = TRUE, minimized = TRUE) |>
   default_draw_tool() |>
-  leaflet::hideGroup(c("Labels", "WNA BEC", "Climate")) |>
+  leaflet::hideGroup(c("WNA BEC", "Climate")) |>
   leaflet::showGroup("Hillshade")
 
 # Shiny App ----
@@ -240,6 +240,9 @@ shiny::shinyApp(
           na.color = "transparent"
         )
       ))
+    })
+    observeEvent(input$downloadoverlay, {
+      session$sendCustomMessage(type="jsCode", list(code = "window.location.assign('%s');" |> sprintf(input$climatevar)))
     })
     
   }
