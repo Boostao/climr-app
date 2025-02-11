@@ -182,6 +182,14 @@ add_custom_render <- function(map) {
         }
       }
 
+      var updateResolution=function(message) {
+        var prefixedLayerId = map.layerManager._layerIdKey(message.category, message.layerId);
+        var layer = map.layerManager._byLayerId[prefixedLayerId];
+        const resolution = message.resolution;
+        layer.options.resolution = resolution;
+        layer.redraw();
+      }
+
       var updateClimatePalette=function(message) {
         var prefixedLayerId = map.layerManager._layerIdKey(message.category, message.layerId);
         var colorOptions = message.colorOptions;
@@ -204,6 +212,7 @@ add_custom_render <- function(map) {
       }
 
       Shiny.addCustomMessageHandler(\'updateOpacity\', updateOpacity);
+      Shiny.addCustomMessageHandler(\'updateResolution\', updateResolution);
       Shiny.addCustomMessageHandler(\'updateClimatePalette\', updateClimatePalette);
 
     }'
