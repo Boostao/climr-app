@@ -134,8 +134,10 @@ shiny::shinyApp(
             ),
             # Overlay parameters
             shiny::div(class = "collapse", id = "collapseOverlayInputs",
+            shiny::selectInput("tifsource", "Source", choices = names(climr_tif)),
               shiny::radioButtons("temporality", "Temporality", c("Annual", "Seasonal", "Monthly"), inline = TRUE),
-              shiny::selectInput("climatevar", "Measurement (1981-2010 Hist. norm.)", choices = c("None" = "NONE", climr_tif[["Annual"]])),
+              shiny::selectInput("climatevar", "Measurement (%s)" |> sprintf(names(climr_tif) |> head(1)),
+                                 choices = c("None" = "NONE", climr_tif[[names(climr_tif) |> head(1)]][temporality %in% "Annual", setNames(url, label)])),
               shiny::selectizeInput("palette", "Overlay color palette", choices = pals$select, selected = "Roma",
                 options = list(render = I('{option: function(item, escape) {return item.label;},item: function(item, escape) {return item.label;}}'))
               ),
@@ -243,8 +245,17 @@ shiny::shinyApp(
     shiny::observeEvent(input$upload, sg$add_file(input$upload))
     shiny::observeEvent(input$sg_remove, sg$rm(input$sg_remove))
     shiny::observeEvent(input$sg_view, sg$view(input$sg_view))
+    shiny::observeEvent(input$tifsource, {
+      shiny::updateSelectInput(
+        inputId = "climatevar", label = "Measurement (%s)" |> sprintf(input$tifsource),
+        choices = c("None" = "NONE", climr_tif[[input$tifsource]][temporality %in% input$temporality, setNames(url, label)])
+      )
+    })
     shiny::observeEvent(input$temporality, {
-      shiny::updateSelectInput(inputId = "climatevar", choices = c("None" = "NONE", climr_tif[[input$temporality]]))
+      shiny::updateSelectInput(
+        inputId = "climatevar",
+        choices = c("None" = "NONE", climr_tif[[input$tifsource]][temporality %in% input$temporality, setNames(url, label)])
+      )
     })
     shiny::observeEvent(input$climatevar, {
       mp <- leaflet::leafletProxy("climr")
