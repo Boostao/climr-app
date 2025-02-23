@@ -36,7 +36,7 @@ url_process <- function(tif_url) {
     fcontent <- content[!type %in% "directory", list(name, url = paste(tif_url, prev, name, sep = "/"))]
     fcontent <- labelf(fcontent)
     if (nrow(fcontent)) {
-      resp[[paste0(prev, "/") |> gsub("^/|/$", "", x = _) |> gsub("/", " - ", x = _)]] <<- fcontent
+      resp[[paste0(prev, "/") |> gsub("^/|/$", "", x = _) |> gsub("/", " - ", x = _) |> gsub("_", " ", x = _)]] <<- fcontent
     }
     for (d in content[type %in% "directory"]$name) {
       p(prev = paste0(prev, "/", d))
@@ -73,7 +73,7 @@ labelf <- function(fcontent) {
     "FFP" = "frost-free period",
     "bFFP" = "Day of the year on which the Frost-Free Period begins",
     "eFFP" = "Day of the year on which the Frost-Free Period ends",
-    "PAS" = "precipitation as snow (mm).",
+    "PAS" = "precipitation as snow (mm)",
     "PET" = "Potential Evapotranspiration",
     "EMT" = "extreme minimum temperature over 30 years (°C)",
     "EXT" = "extreme maximum temperature over 30 years (°C)",

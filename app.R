@@ -121,57 +121,64 @@ shiny::shinyApp(
           leaflet::leafletOutput("climr", width = "100%", height = "100%"),
           shiny::absolutePanel(
             class = "input-control",
-            shiny::fileInput("upload", "Upload geometry or raster file"),
-            shiny::actionButton(
-              "toggleDownscaleInputs", "Downscale Parameters", class = "btn btn-info btn-sm",
-             `data-bs-toggle` = "collapse", `data-bs-target` = "#collapseDownscaleInputs",
-              onclick="$('#collapseOverlayInputs').removeClass('show');"
-            ),
-            shiny::actionButton(
-              "toggleOverlayInputs", "Climate Overlay", class = "btn btn-info btn-sm",
-               `data-bs-toggle` = "collapse", `data-bs-target` = "#collapseOverlayInputs",
-                onclick="$('#collapseDownscaleInputs').removeClass('show');"
-            ),
-            # Overlay parameters
-            shiny::div(class = "collapse", id = "collapseOverlayInputs",
-            shiny::selectInput("tifsource", "Source", choices = names(climr_tif)),
-              shiny::radioButtons("temporality", "Temporality", c("Annual", "Seasonal", "Monthly"), inline = TRUE),
-              shiny::selectInput("climatevar", "Measurement (%s)" |> sprintf(names(climr_tif) |> head(1)),
-                                 choices = c("None" = "NONE", climr_tif[[names(climr_tif) |> head(1)]][temporality %in% "Annual", setNames(url, label)])),
-              shiny::selectizeInput("palette", "Overlay color palette", choices = pals$select, selected = "Roma",
-                options = list(render = I('{option: function(item, escape) {return item.label;},item: function(item, escape) {return item.label;}}'))
+            shiny::div(class = "input-control-header", shiny::h4("Controls")),
+            shiny::div(class = "input-control-body",
+              shiny::fileInput("upload", "Upload geometry or raster file"),
+              shiny::actionButton(
+                "toggleDownscaleInputs", "Downscale Parameters", class = "btn btn-info btn-sm",
+               `data-bs-toggle` = "collapse", `data-bs-target` = "#collapseDownscaleInputs",
+                onclick="$('#collapseOverlayInputs').removeClass('show');"
               ),
-              shiny::sliderInput("opacity", "Overlay opacity", value = 80, min = 0, max = 100, step = 1, ticks = FALSE),
-              shiny::sliderInput("resolution", "Overlay resolution", value = 96, min = 24, max = 384, step = 12, post = "px", ticks = FALSE),
-              shiny::actionButton("downloadoverlay", "Download Overlay", class = "btn btn-secondary btn-sm", disabled = TRUE)
-            ),
-            # Downscale parameters
-            shiny::div(class = "collapse", id = "collapseDownscaleInputs",
-              shiny::selectInput("downscale_which_refmap", "Reference Map",
-                choices = c(
-                  list("Auto" = "auto"),
-                  local({z <- climr::list_refmaps(); substr(z, 8L, z |> nchar()) |> tools::toTitleCase() |> setNames(object = z, nm = _)})
-                )
+              shiny::actionButton(
+                "toggleOverlayInputs", "Climate Overlay", class = "btn btn-info btn-sm",
+                 `data-bs-toggle` = "collapse", `data-bs-target` = "#collapseOverlayInputs",
+                  onclick="$('#collapseDownscaleInputs').removeClass('show');"
               ),
-              shiny::selectInput("downscale_obs_periods", "Observation periods", choices = climr::list_obs_periods()),
-              shiny::selectInput("downscale_obs_years", "Observation years", choices = climr::list_obs_years(), multiple = TRUE),
-              shiny::selectInput(
-                "downscale_obs_ts_dataset", "Observation time-series data",
-                 choices = c("ClimateNA" = "climatena", "Climatic Research Unit / Global Precipitation Climatology Centre" = "cru.gpcc")
+              # Overlay parameters
+              shiny::div(class = "collapse", id = "collapseOverlayInputs",
+                shiny::hr(),
+                shiny::actionButton("selectoverlay", "Select overlay", class = "btn btn-primary btn-sm", width = "100%"),
+                shiny::sliderInput("opacity", "Overlay opacity", value = 80, min = 0, max = 100, step = 1, post = "%", ticks = FALSE),
+                shiny::sliderInput("resolution", "Overlay resolution", value = 96, min = 24, max = 384, step = 12, post = "px", ticks = FALSE),
+                shiny::div(style = "display: inline-flex; gap: 8px",
+                  shiny::selectizeInput(
+                    "palette", label = NULL, choices = pals$select, selected = "Roma", width = "225px",
+                    options = list(render = I('{option: function(item, escape) {return item.label;},item: function(item, escape) {return item.label;}}'))
+                  ),
+                  shiny::checkboxInput("inverse", "Invert", width = "72px")
+                ),
+                shiny::br(),
+                shiny::actionButton("downloadoverlay", "Download Overlay", class = "btn btn-primary btn-sm", disabled = TRUE, width = "100%")
               ),
-              shiny::selectInput("downscale_gcsm", "Global climate model", choices = climr::list_gcms(), multiple = TRUE),
-              shiny::selectInput("downscale_ssps", "SSP-RCP scenarios", choices = climr::list_ssps(), multiple = TRUE),
-              
-              shiny::selectInput("downscale_gcm_periods", "GCM Periods", choices = climr::list_gcm_periods(), multiple = TRUE),
-              shiny::selectInput("downscale_gcm_ssp_years", "GCM SSP Years", choices = climr::list_gcm_ssp_years(), multiple = TRUE),
-              shiny::selectInput("downscale_gcm_hist_years", "GCM Historical Years", choices = climr::list_gcm_hist_years(), multiple = TRUE),
-              shiny::selectInput("downscale_max_run", "Maximum number of model runs", choices = c("ensembleMean" = 0, 1:10), multiple = FALSE),
-              shiny::selectInput("downscale_run_nm", "Name of specified runs", choices = c("#TODO"), multiple = TRUE),
-              shiny::selectInput("downscale_core_vars", "Climate variables", choices = climr::list_vars(), multiple = TRUE),
-              shiny::checkboxInput("downscale_core_ppt_lr", "Precipitaion elevation adjustment"),
-
-              shiny::actionButton("downscale_run", "Run", class = "btn btn-secondary btn-sm", disabled = TRUE)
-            ),
+              # Downscale parameters
+              shiny::div(class = "collapse", id = "collapseDownscaleInputs",
+                shiny::hr(),
+                shiny::selectInput("downscale_which_refmap", "Reference Map",
+                  choices = c(
+                    list("Auto" = "auto"),
+                    local({z <- climr::list_refmaps(); substr(z, 8L, z |> nchar()) |> tools::toTitleCase() |> setNames(object = z, nm = _)})
+                  )
+                ),
+                shiny::selectInput("downscale_obs_periods", "Observation periods", choices = climr::list_obs_periods()),
+                shiny::selectInput("downscale_obs_years", "Observation years", choices = climr::list_obs_years(), multiple = TRUE),
+                shiny::selectInput(
+                  "downscale_obs_ts_dataset", "Observation time-series data",
+                   choices = c("ClimateNA" = "climatena", "Climatic Research Unit / Global Precipitation Climatology Centre" = "cru.gpcc")
+                ),
+                shiny::selectInput("downscale_gcsm", "Global climate model", choices = climr::list_gcms(), multiple = TRUE),
+                shiny::selectInput("downscale_ssps", "SSP-RCP scenarios", choices = climr::list_ssps(), multiple = TRUE),
+                
+                shiny::selectInput("downscale_gcm_periods", "GCM Periods", choices = climr::list_gcm_periods(), multiple = TRUE),
+                shiny::selectInput("downscale_gcm_ssp_years", "GCM SSP Years", choices = climr::list_gcm_ssp_years(), multiple = TRUE),
+                shiny::selectInput("downscale_gcm_hist_years", "GCM Historical Years", choices = climr::list_gcm_hist_years(), multiple = TRUE),
+                shiny::selectInput("downscale_max_run", "Maximum number of model runs", choices = c("ensembleMean" = 0, 1:10), multiple = FALSE),
+                shiny::selectInput("downscale_run_nm", "Name of specified runs", choices = c("#TODO"), multiple = TRUE),
+                shiny::selectInput("downscale_core_vars", "Climate variables", choices = climr::list_vars(), multiple = TRUE),
+                shiny::checkboxInput("downscale_core_ppt_lr", "Precipitaion elevation adjustment"),
+  
+                shiny::actionButton("downscale_run", "Run", class = "btn btn-secondary btn-sm", disabled = TRUE, width = "100%")
+              )
+            )           
           )
         )
       ),
@@ -233,6 +240,12 @@ shiny::shinyApp(
     session$allowReconnect("force")
 
     output$climr <- leaflet::renderLeaflet(l)
+    vstore <- reactiveValues(
+      temporality = "Annual",
+      tifsource = names(climr_tif) |> head(1),
+      climatevar = "NONE"
+    )
+    
 
     source("scripts/geometry.R", local = TRUE)
     sg <- session_geometry()
@@ -245,41 +258,60 @@ shiny::shinyApp(
     shiny::observeEvent(input$upload, sg$add_file(input$upload))
     shiny::observeEvent(input$sg_remove, sg$rm(input$sg_remove))
     shiny::observeEvent(input$sg_view, sg$view(input$sg_view))
+    shiny::observeEvent(input$selectoverlay, {
+      shiny::showModal(
+        shiny::modalDialog(
+          title = "Climate Overlay Selection", size = "xl", easyClose = TRUE, fade = FALSE, class = ".modal-dialog-centered",
+          shiny::selectInput("tifsource", "Source", choices = names(climr_tif), width = "100%", selected = vstore[["tifsource"]]),
+          shiny::radioButtons("temporality", "Temporality", c("Annual", "Seasonal", "Monthly"), inline = TRUE, selected = vstore[["temporality"]]),
+          shiny::selectInput(
+            "climatevar", "Variables (%s)" |> sprintf(vstore[["tifsource"]]), selectize = TRUE, width = "100%",
+            choices = c("None" = "NONE", climr_tif[[vstore[["tifsource"]]]][temporality %in% vstore[["temporality"]], setNames(url, label)]),
+            selected = vstore[["climatevar"]]
+          )
+        )
+      )
+    })
     shiny::observeEvent(input$tifsource, {
+      vstore[["tifsource"]] <- input$tifsource
       shiny::updateSelectInput(
-        inputId = "climatevar", label = "Measurement (%s)" |> sprintf(input$tifsource),
-        choices = c("None" = "NONE", climr_tif[[input$tifsource]][temporality %in% input$temporality, setNames(url, label)])
+        inputId = "climatevar", label = "Variables (%s)" |> sprintf(vstore[["tifsource"]]),
+        choices = c("None" = "NONE", climr_tif[[vstore[["tifsource"]]]][temporality %in% vstore[["temporality"]], setNames(url, label)])
       )
     })
     shiny::observeEvent(input$temporality, {
+      vstore[["temporality"]] <- input$temporality
       shiny::updateSelectInput(
         inputId = "climatevar",
-        choices = c("None" = "NONE", climr_tif[[input$tifsource]][temporality %in% input$temporality, setNames(url, label)])
+        choices = c("None" = "NONE", climr_tif[[vstore[["tifsource"]]]][temporality %in% vstore[["temporality"]], setNames(url, label)])
       )
     })
     shiny::observeEvent(input$climatevar, {
+      vstore[["climatevar"]] <- input$climatevar
       mp <- leaflet::leafletProxy("climr")
-      mp |> removeTiles("val")
+      mp |> leaflet::clearGroup("Climate") |> leaflet::hideGroup("Climate")
       session$sendCustomMessage(type="jsCode", list(code= "$('#rasterValues-val').remove();"))
       shiny::updateActionButton(inputId = "downloadoverlay", disabled = TRUE)
-      if ("NONE" %in% input$climatevar | 0 == input$opacity) return()
+      if ("NONE" %in% vstore[["climatevar"]] | 0 == input$opacity) return()
       shiny::updateActionButton(inputId = "downloadoverlay", disabled = FALSE)
+      prefix <- vstore[["climatevar"]] |> basename() |> tools::file_path_sans_ext()
       mp |> leafem::addGeotiff(      
-        url = input$climatevar,
+        url = vstore[["climatevar"]],
         group = "Climate",
         layerId = "val",
         project = FALSE,
         opacity = input$opacity / 100,
         colorOptions = leafem::colorOptions(
-          palette = pals$colors[[input$palette]],
+          palette = pals$colors[[input$palette]] |> {if (input$inverse) rev else identity}(),
           na.color = "transparent"
         ),
         imagequery = TRUE,
         imagequeryOptions = leafem::imagequeryOptions(
-          prefix = input$climatevar |> basename() |> tools::file_path_sans_ext()
+          prefix = prefix
         ),
         autozoom = FALSE
       ) |> leaflet::showGroup("Climate")
+      shiny::showNotification("Rendering %s values" |> sprintf(prefix), duration = 5)
     })
     shiny::observeEvent(input$opacity, {
       session$sendCustomMessage(type="updateOpacity", list(category = "image", layerId = "val", opacity = input$opacity /100))
@@ -287,16 +319,17 @@ shiny::shinyApp(
     shiny::observeEvent(shiny::debounce(input$resolution, 500), {
       session$sendCustomMessage(type="updateResolution", list(category = "image", layerId = "val", resolution = input$resolution))
     })
-    shiny::observeEvent(input$palette, {
+    shiny::observe({
+      fpal <- if (isTRUE(input$inverse)) rev else identity
       session$sendCustomMessage(type="updateClimatePalette", list(
         category = "image", layerId = "val", colorOptions = leafem::colorOptions(
-          palette = pals$colors[[input$palette]],
+          palette = pals$colors[[input$palette]] |> fpal(),
           na.color = "transparent"
         )
       ))
     })
     shiny::observeEvent(input$downloadoverlay, {
-      session$sendCustomMessage(type="jsCode", list(code = "window.location.assign('%s');" |> sprintf(input$climatevar)))
+      session$sendCustomMessage(type="jsCode", list(code = "window.location.assign('%s');" |> sprintf(vstore[["climatevar"]])))
     })
     
   }

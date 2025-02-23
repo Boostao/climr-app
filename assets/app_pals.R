@@ -1,4 +1,4 @@
-generate_pal_img <- function(palette, w = 256, h = 10) {
+generate_pal_img <- function(palette, w = 170, h = 10) {
   # Generate color palette
   colors <- grDevices::hcl.colors(w, palette = palette)
   # SVG string
