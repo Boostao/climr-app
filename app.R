@@ -124,59 +124,21 @@ shiny::shinyApp(
             shiny::div(class = "input-control-header", shiny::h4("Controls")),
             shiny::div(class = "input-control-body",
               shiny::fileInput("upload", "Upload geometry or raster file"),
-              shiny::actionButton(
-                "toggleDownscaleInputs", "Downscale Parameters", class = "btn btn-info btn-sm",
-               `data-bs-toggle` = "collapse", `data-bs-target` = "#collapseDownscaleInputs",
-                onclick="$('#collapseOverlayInputs').removeClass('show');"
-              ),
-              shiny::actionButton(
-                "toggleOverlayInputs", "Climate Overlay", class = "btn btn-info btn-sm",
-                 `data-bs-toggle` = "collapse", `data-bs-target` = "#collapseOverlayInputs",
-                  onclick="$('#collapseDownscaleInputs').removeClass('show');"
-              ),
-              # Overlay parameters
-              shiny::div(class = "collapse", id = "collapseOverlayInputs",
-                shiny::hr(),
-                shiny::actionButton("selectoverlay", "Select overlay", class = "btn btn-primary btn-sm", width = "100%"),
-                shiny::sliderInput("opacity", "Overlay opacity", value = 80, min = 0, max = 100, step = 1, post = "%", ticks = FALSE),
-                shiny::sliderInput("resolution", "Overlay resolution", value = 96, min = 24, max = 384, step = 12, post = "px", ticks = FALSE),
-                shiny::div(style = "display: inline-flex; gap: 8px",
-                  shiny::selectizeInput(
-                    "palette", label = NULL, choices = pals$select, selected = "Roma", width = "225px",
-                    options = list(render = I('{option: function(item, escape) {return item.label;},item: function(item, escape) {return item.label;}}'))
-                  ),
-                  shiny::checkboxInput("inverse", "Invert", width = "72px")
-                ),
-                shiny::br(),
-                shiny::actionButton("downloadoverlay", "Download Overlay", class = "btn btn-primary btn-sm", disabled = TRUE, width = "100%")
-              ),
               # Downscale parameters
-              shiny::div(class = "collapse", id = "collapseDownscaleInputs",
-                shiny::hr(),
-                shiny::selectInput("downscale_which_refmap", "Reference Map",
-                  choices = c(
-                    list("Auto" = "auto"),
-                    local({z <- climr::list_refmaps(); substr(z, 8L, z |> nchar()) |> tools::toTitleCase() |> setNames(object = z, nm = _)})
-                  )
+              shiny::actionButton("downscale_parameters", "Downscale Parameters", class = "btn btn-primary btn-sm", width = "63%"),  
+              shiny::actionButton("downscale_process", "Process", class = "btn btn-primary btn-sm", disabled = TRUE, width = "35%"),
+              # Overlay parameters
+              shiny::hr(),
+              shiny::actionButton("selectoverlay", "Select Climate Overlay", class = "btn btn-primary btn-sm", width = "63%"),
+              shiny::actionButton("downloadoverlay", "Download", class = "btn btn-primary btn-sm", disabled = TRUE, width = "35%"),
+              shiny::sliderInput("opacity", "Overlay opacity", value = 80, min = 0, max = 100, step = 1, post = "%", ticks = FALSE),
+              shiny::sliderInput("resolution", "Overlay resolution", value = 96, min = 24, max = 384, step = 12, post = "px", ticks = FALSE),
+              shiny::div(style = "display: inline-flex; gap: 8px",
+                shiny::selectizeInput(
+                  "palette", label = NULL, choices = pals$select, selected = "Roma", width = "225px",
+                  options = list(render = I('{option: function(item, escape) {return item.label;},item: function(item, escape) {return item.label;}}'))
                 ),
-                shiny::selectInput("downscale_obs_periods", "Observation periods", choices = climr::list_obs_periods()),
-                shiny::selectInput("downscale_obs_years", "Observation years", choices = climr::list_obs_years(), multiple = TRUE),
-                shiny::selectInput(
-                  "downscale_obs_ts_dataset", "Observation time-series data",
-                   choices = c("ClimateNA" = "climatena", "Climatic Research Unit / Global Precipitation Climatology Centre" = "cru.gpcc")
-                ),
-                shiny::selectInput("downscale_gcsm", "Global climate model", choices = climr::list_gcms(), multiple = TRUE),
-                shiny::selectInput("downscale_ssps", "SSP-RCP scenarios", choices = climr::list_ssps(), multiple = TRUE),
-                
-                shiny::selectInput("downscale_gcm_periods", "GCM Periods", choices = climr::list_gcm_periods(), multiple = TRUE),
-                shiny::selectInput("downscale_gcm_ssp_years", "GCM SSP Years", choices = climr::list_gcm_ssp_years(), multiple = TRUE),
-                shiny::selectInput("downscale_gcm_hist_years", "GCM Historical Years", choices = climr::list_gcm_hist_years(), multiple = TRUE),
-                shiny::selectInput("downscale_max_run", "Maximum number of model runs", choices = c("ensembleMean" = 0, 1:10), multiple = FALSE),
-                shiny::selectInput("downscale_run_nm", "Name of specified runs", choices = c("#TODO"), multiple = TRUE),
-                shiny::selectInput("downscale_core_vars", "Climate variables", choices = climr::list_vars(), multiple = TRUE),
-                shiny::checkboxInput("downscale_core_ppt_lr", "Precipitaion elevation adjustment"),
-  
-                shiny::actionButton("downscale_run", "Run", class = "btn btn-secondary btn-sm", disabled = TRUE, width = "100%")
+                shiny::checkboxInput("inverse", "Invert", width = "72px")
               )
             )           
           )
@@ -239,38 +201,202 @@ shiny::shinyApp(
     
     session$allowReconnect("force")
 
+    # ---- Modal input storage
     output$climr <- leaflet::renderLeaflet(l)
     vstore <- reactiveValues(
       temporality = "Annual",
       tifsource = names(climr_tif) |> head(1),
-      climatevar = "NONE"
+      climatevar = "NONE",
+      downscale_which_refmap = "auto",
+      downscale_obs_periods = "NULL",
+      downscale_obs_years = c(),
+      downscale_obs_ts_dataset = "NULL",
+      downscale_gcsm = c(),
+      downscale_ssps = c(),
+      downscale_gcm_periods = c(),
+      downscale_gcm_ssp_years = c(),
+      downscale_gcm_hist_years = c(),
+      downscale_max_run = 0L,
+      downscale_run_nm = c(),
+      downscale_core_vars = sort(sprintf(c("PPT_%02d", "Tmax_%02d", "Tmin_%02d"), sort(rep(1:12, 3)))),
+      downscale_core_ppt_lr = FALSE
     )
     
-
+    # ---- Geometry
     source("scripts/geometry.R", local = TRUE)
     sg <- session_geometry()
 
-    ## Map events
-    shiny::observeEvent(input$climr_draw_start, sg$add_point_enabled(FALSE))
-    shiny::observeEvent(input$climr_draw_stop, sg$add_point_enabled(TRUE))
+    # ---- Map events
+    shiny::observeEvent(input$climr_draw_start,       sg$add_point_enabled(FALSE))
+    shiny::observeEvent(input$climr_draw_stop,        sg$add_point_enabled(TRUE))
     shiny::observeEvent(input$climr_draw_new_feature, sg$add_draw_poly(input$climr_draw_new_feature))
-    shiny::observeEvent(input$climr_click, sg$add_point(input$climr_click$lat, input$climr_click$lng))
-    shiny::observeEvent(input$upload, sg$add_file(input$upload))
-    shiny::observeEvent(input$sg_remove, sg$rm(input$sg_remove))
-    shiny::observeEvent(input$sg_view, sg$view(input$sg_view))
+    shiny::observeEvent(input$climr_click,            sg$add_point(input$climr_click$lat, input$climr_click$lng))
+    shiny::observeEvent(input$upload,                 sg$add_file(input$upload))
+    shiny::observeEvent(input$sg_remove,              sg$rm(input$sg_remove))
+    shiny::observeEvent(input$sg_view,                sg$view(input$sg_view))
+
+    # ---- Downscale events
+    shiny::observeEvent(input$downscale_parameters, {
+      shiny::showModal(
+        shiny::modalDialog(
+          title = "Downscale Parameters", size = "xl", easyClose = TRUE, fade = FALSE, class = "modal-dialog-scrollable",
+          shiny::selectInput(
+            inputId = "downscale_which_refmap",
+            label =  "Reference Map",
+            width = "100%",
+            choices = c(
+              list("Auto" = "auto"),
+              local({z <- climr::list_refmaps(); substr(z, 8L, z |> nchar()) |> tools::toTitleCase() |> setNames(object = z, nm = _)})
+            ),
+            selected = vstore[["downscale_which_refmap"]]
+          ),
+          shiny::selectInput(
+            inputId = "downscale_obs_periods",
+            label =  "Observation periods",
+            width = "100%",
+            choices = c("Null" = "NULL", climr::list_obs_periods()),
+            selected = vstore[["downscale_obs_periods"]]
+          ),
+          shiny::selectInput(
+            inputId = "downscale_obs_years",
+            label = "Observation years",
+            width = "100%",
+            choices = climr::list_obs_years(),
+            multiple = TRUE,
+            selected = c()
+          ),
+          shiny::selectInput(
+            inputId = "downscale_obs_ts_dataset",
+            label = "Observation time-series data",
+            width = "100%",
+            selected = vstore[["downscale_obs_ts_dataset"]],
+            choices = c("Null" = "NULL", "ClimateNA" = "climatena", "Climatic Research Unit / Global Precipitation Climatology Centre" = "cru.gpcc")
+          ),
+          shiny::selectInput(
+            inputId = "downscale_gcsm",
+            label = "Global climate model",
+            width = "100%",
+            choices = climr::list_gcms(),
+            multiple = TRUE,
+            selected = vstore[["downscale_gcsm"]]
+          ),
+          shiny::selectInput(
+            inputId = "downscale_ssps",
+            label = "Shared Socio-economic Pathways (SSP) - Representative Concentration Pathways (RCP) Scenarios",
+            width = "100%",
+            choices = climr::list_ssps(),
+            multiple = TRUE,
+            selected = vstore[["downscale_ssps"]]
+          ),          
+          shiny::selectInput(
+            inputId = "downscale_gcm_periods",
+            label = "General Circulation Model (GCM) Periods",
+            width = "100%",
+            choices = climr::list_gcm_periods(),
+            multiple = TRUE,
+            selected = vstore[["downscale_gcm_periods"]]
+          ),
+          shiny::selectInput(
+            inputId = "downscale_gcm_ssp_years",
+            label = "General circulation model (GCM) Shared Socio-economic Pathways (SSP) Years",
+            width = "100%",
+            choices = climr::list_gcm_ssp_years(),
+            multiple = TRUE,
+            selected = vstore[["downscale_gcm_ssp_years"]]
+          ),
+          shiny::selectInput(
+            inputId = "downscale_gcm_hist_years",
+            label = "General circulation model (GCM) Historical Years",
+            width = "100%",
+            choices = climr::list_gcm_hist_years(),
+            multiple = TRUE,
+            selected = vstore[["downscale_gcm_hist_years"]]
+          ),
+          shiny::selectInput(
+            inputId = "downscale_max_run",
+            label = "Maximum number of model runs",
+            width = "100%",
+            choices = c("ensembleMean" = 0, 1:10),
+            multiple = FALSE,
+            selected = vstore[["downscale_max_run"]]
+          ),
+          shiny::selectInput(
+            inputId = "downscale_run_nm",
+            label = "Name of specified runs",
+            width = "100%",
+            choices = c(),
+            multiple = TRUE,
+            selected = vstore[["downscale_run_nm"]]
+          ),
+          shiny::selectInput(
+            inputId = "downscale_core_vars",
+            label = "Climate variables",
+            width = "100%",
+            choices = climr::list_vars(),
+            multiple = TRUE,
+            selected = vstore[["downscale_core_vars"]]
+          ),
+          shiny::checkboxInput(
+            inputId = "downscale_core_ppt_lr",
+            label = "Precipitaion elevation adjustment"
+          ),
+        )
+      )
+      session$sendCustomMessage(type="jsCode", list(code= "$('.modal-dialog.modal-xl').addClass('modal-dialog-scrollable');"))
+    })
+    shiny::observeEvent(input$downscale_which_refmap, {vstore[["downscale_which_refmap"]] <- input$downscale_which_refmap})
+    shiny::observeEvent(input$downscale_obs_periods, {vstore[["downscale_obs_periods"]] <- input$downscale_obs_periods})
+    shiny::observeEvent(input$downscale_obs_years, {vstore[["downscale_obs_years"]] <- input$downscale_obs_years})
+    shiny::observeEvent(input$downscale_obs_ts_dataset, {vstore[["downscale_obs_ts_dataset"]] <- input$downscale_obs_ts_dataset})
+    shiny::observeEvent(input$downscale_gcsm, {vstore[["downscale_gcsm"]] <- input$downscale_gcsm})
+    shiny::observeEvent(input$downscale_ssps, {vstore[["downscale_ssps"]] <- input$downscale_ssps})
+    shiny::observeEvent(input$downscale_gcm_periods, {vstore[["downscale_gcm_periods"]] <- input$downscale_gcm_periods})
+    shiny::observeEvent(input$downscale_gcm_ssp_years, {vstore[["downscale_gcm_ssp_years"]] <- input$downscale_gcm_ssp_years})
+    shiny::observeEvent(input$downscale_gcm_hist_years, {vstore[["downscale_gcm_hist_years"]] <- input$downscale_gcm_hist_years})
+    shiny::observeEvent(input$downscale_max_run, {vstore[["downscale_max_run"]] <- input$downscale_max_run})
+    shiny::observeEvent(input$downscale_run_nm, {vstore[["downscale_run_nm"]] <- input$downscale_run_nm})
+    shiny::observeEvent(input$downscale_core_vars, {vstore[["downscale_core_vars"]] <- input$downscale_core_vars})
+    shiny::observeEvent(input$downscale_core_ppt_lr, {vstore[["downscale_core_ppt_lr"]] <- input$downscale_core_ppt_lr})
+    shiny::observe({
+      gcms <- vstore[["downscale_gcsm"]]
+      ssps <- vstore[["downscale_ssps"]]
+      if (!length(gcms) && !length(ssps)) {
+        shiny::updateSelectInput(inputId = "downscale_run_nm", choices = c())
+      } else if (length(gcms) && !length(ssps)) {
+        shiny::updateSelectInput(inputId = "downscale_run_nm", choices = climr::list_runs_historic(gcm = gcms))
+      } else if (length(gcms) && length(ssps)) {
+        shiny::updateSelectInput(inputId = "downscale_run_nm", choices = climr::list_runs_ssp(gcm = gcms, ssp = ssps))
+      }
+    })
+
+    # ---- Overlay events
     shiny::observeEvent(input$selectoverlay, {
       shiny::showModal(
         shiny::modalDialog(
-          title = "Climate Overlay Selection", size = "xl", easyClose = TRUE, fade = FALSE, class = ".modal-dialog-centered",
-          shiny::selectInput("tifsource", "Source", choices = names(climr_tif), width = "100%", selected = vstore[["tifsource"]]),
-          shiny::radioButtons("temporality", "Temporality", c("Annual", "Seasonal", "Monthly"), inline = TRUE, selected = vstore[["temporality"]]),
+          title = "Climate Overlay Selection", size = "xl", easyClose = TRUE, fade = FALSE,
           shiny::selectInput(
-            "climatevar", "Variables (%s)" |> sprintf(vstore[["tifsource"]]), selectize = TRUE, width = "100%",
+            inputId = "tifsource",
+            label =  "Source",
+            width = "100%",
+            choices = names(climr_tif),
+            selected = vstore[["tifsource"]]
+          ),
+          shiny::radioButtons(
+            inputId = "temporality", "Temporality", c("Annual", "Seasonal", "Monthly"),
+            inline = TRUE,
+            selected = vstore[["temporality"]]
+          ),
+          shiny::selectInput(
+            inputId = "climatevar", 
+            label = "Variables (%s)" |> sprintf(vstore[["tifsource"]]),
+            selectize = TRUE,
+            width = "100%",
             choices = c("None" = "NONE", climr_tif[[vstore[["tifsource"]]]][temporality %in% vstore[["temporality"]], setNames(url, label)]),
             selected = vstore[["climatevar"]]
           )
         )
       )
+      session$sendCustomMessage(type="jsCode", list(code= "$('.modal-dialog.modal-xl').addClass('modal-dialog-scrollable');"))
     })
     shiny::observeEvent(input$tifsource, {
       vstore[["tifsource"]] <- input$tifsource
@@ -318,6 +444,13 @@ shiny::shinyApp(
     })
     shiny::observeEvent(shiny::debounce(input$resolution, 500), {
       session$sendCustomMessage(type="updateResolution", list(category = "image", layerId = "val", resolution = input$resolution))
+    })
+    shiny::observeEvent(input$inverse, {
+      if (isTRUE(input$inverse)) {
+        session$sendCustomMessage(type="jsCode", list(code= "$('.palselect').addClass('palselect-invert');"))
+      } else {
+        session$sendCustomMessage(type="jsCode", list(code= "$('.palselect').removeClass('palselect-invert');"))
+      }      
     })
     shiny::observe({
       fpal <- if (isTRUE(input$inverse)) rev else identity

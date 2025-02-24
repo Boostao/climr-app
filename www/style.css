@@ -48,10 +48,29 @@ div.input-control-body {
   padding: 5px 10px 5px 10px;
 }
 
-div.input-control .control-label .checkbox {
-  font-size: 0.85rem;
+.selectize-dropdown, .selectize-input, .selectize-input input, #upload-label, #opacity-label, #resolution-label {
+  font-size: 0.85rem !important;
 }
 
-.selectize-dropdown, .selectize-input, .selectize-input input {
-  font-size: 0.75rem !important;
+.form-group .input-group input.form-control {
+  line-height: 1.1 !important;
+}
+
+.form-group .input-group .input-group-btn .btn-file {
+  --bs-btn-padding-y: .25rem;
+  --bs-btn-padding-x: .5rem;
+  --bs-btn-font-size: .875rem;
+  --bs-btn-border-radius: var(--bs-border-radius-sm);
+}
+
+.form-group {
+  margin-bottom: 0.5rem !important;
+}
+
+.form-group .checkbox {
+  margin-top: .250rem;
+}
+
+.palselect-invert {
+  transform: scaleX(-1);
 }

@@ -23,7 +23,7 @@ generate_pal_img <- function(palette, w = 170, h = 10) {
   base64_data <- base64enc::base64encode(webp_data)
   
   # Construct the base64 image string
-  base64_image <- paste0("<img height=", h," width=", w," src=\"data:image/webp;base64,", base64_data, "\" alt=\"", palette,"\">")
+  base64_image <- paste0("<img height=", h," width=", w," class=\"palselect\" src=\"data:image/webp;base64,", base64_data, "\" alt=\"", palette,"\">")
 }
 
 pals <- list(
