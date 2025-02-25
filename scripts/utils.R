@@ -161,10 +161,6 @@ registerPlugin <- function(map, plugin) {
   map
 }
 
-add_climate_na <- function(map) {
-
-}
-
 add_custom_render <- function(map) {
   subzones_colours_ref <- data.table::fread("data/WNAv12_3_SubzoneCols.csv", key = "classification")
   map <- registerPlugin(map, plugins$vgplugin)

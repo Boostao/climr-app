@@ -56,30 +56,31 @@ session_geometry <- function() {
       ))
     })
   }
+  refresh_DT()
 
   update_map_marker <- function() {
-    fg <- sg[group == "marker"]
+    mg <- sg[group == "marker"]
     mp |> leaflet::clearGroup("sg_marker")
-    if (nrow(fg)) {
+    if (nrow(mg)) {
       mp |> leaflet::addAwesomeMarkers(
-        data = terra::vect(fg$wkt),
+        data = terra::vect(mg$wkt),
         group = "sg_marker",
-        popup = lapply(fg$id, rem_popup),
+        popup = lapply(mg$id, rem_popup),
         icon = default_icon
       )
     }
   }
 
   update_map_shape <- function() {
-    fg <- sg[group == "shape"]
+    mg <- sg[group == "shape"]
     mp |> leaflet::clearGroup("sg_shape") |>
       leaflet.extras::removeDrawToolbar(clearFeatures = TRUE) |>
       default_draw_tool()
-    if (nrow(fg)) {
+    if (nrow(mg)) {
       mp |> leaflet::addPolygons(
-        data = terra::vect(fg$wkt),
+        data = terra::vect(mg$wkt),
         group = "sg_shape",
-        popup = lapply(fg$id, rem_popup),
+        popup = lapply(mg$id, rem_popup),
         fillColor = "#fcba19",
         color = "#036",
         opacity = 0.8,
@@ -116,6 +117,7 @@ session_geometry <- function() {
 
   refresh <- function(g) {
     refresh_DT()
+    shiny::updateActionButton(inputId = "downscale_process", disabled = {nrow(sg) <= 0})
     if ("marker" %in% g) update_map_marker()
     if ("shape" %in% g) update_map_shape()
   }
@@ -281,6 +283,42 @@ session_geometry <- function() {
       report_msg("Unable to ingest uploaded file. [%s]" |> sprintf(f$name), "danger")
       return()
 
+    },
+    process = function() {
+      withCallingHandlers(
+        message = function(m) {shiny::showNotification(ui = shiny::span(conditionMessage(m)), type = "message")},
+        warning = function(w) {shiny::showNotification(ui = shiny::span(conditionMessage(w)), type = "warning")},
+        tryCatch(
+          {
+            n <- \(x) if (length(x) && !"NULL" %in% x) x
+            res <- climr::downscale(
+              xyz = xyz,
+              which_refmap = vstore[["downscale_which_refmap"]],
+              obs_periods = vstore[["downscale_obs_periods"]] |> n(),
+              obs_years  = vstore[["downscale_obs_years "]] |> n(),
+              obs_ts_dataset = vstore[["downscale_obs_ts_dataset"]] |> n(),
+              gcsm = vstore[["downscale_gcsm"]] |> n(),
+              ssps = vstore[["downscale_ssps"]] |> n(),
+              gcm_periods = vstore[["downscale_gcm_periods"]] |> n(),
+              gcm_ssp_years = vstore[["downscale_gcm_ssp_years"]] |> n(),
+              gcm_hist_years = vstore[["downscale_gcm_hist_years"]] |> n(),
+              max_run = vstore[["downscale_max_run"]] |> n(),
+              run_nm = vstore[["downscale_run_nm"]] |> n(),
+              core_vars = vstore[["downscale_core_vars"]] |> n(),
+              core_ppt_lr = vstore[["downscale_core_ppt_lr"]],
+              cache = FALSE
+            )
+            output$downscale_download <<- shiny::downloadHandler(
+              filename = function() tempfile("downscale_", fileext = ".zip"),
+              content = function(file) {},
+              contentType = "application/zip"
+            )
+          },
+          error = function(e) {
+            report_msg(conditionMessage(e), type = "danger")
+          }
+        )
+      )
     },
     get = function() {
       return(sg)

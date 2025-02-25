@@ -74,3 +74,7 @@ div.input-control-body {
 .palselect-invert {
   transform: scaleX(-1);
 }
+
+#downscale_download {
+  width: 17%;
+}

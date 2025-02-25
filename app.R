@@ -125,12 +125,13 @@ shiny::shinyApp(
             shiny::div(class = "input-control-body",
               shiny::fileInput("upload", "Upload geometry or raster file"),
               # Downscale parameters
-              shiny::actionButton("downscale_parameters", "Downscale Parameters", class = "btn btn-primary btn-sm", width = "63%"),  
-              shiny::actionButton("downscale_process", "Process", class = "btn btn-primary btn-sm", disabled = TRUE, width = "35%"),
+              shiny::actionButton("downscale_parameters", "Downscale Parameters", class = "btn btn-primary btn-sm", width = "62%"),  
+              shiny::actionButton("downscale_process", label = "", class = "btn btn-secondary btn-sm", icon = shiny::icon("gear"), width = "17%", disabled = TRUE),
+              shiny::downloadButton("downscale_download", label = "", class = "btn btn-secondary btn-sm"),
               # Overlay parameters
               shiny::hr(),
-              shiny::actionButton("selectoverlay", "Select Climate Overlay", class = "btn btn-primary btn-sm", width = "63%"),
-              shiny::actionButton("downloadoverlay", "Download", class = "btn btn-primary btn-sm", disabled = TRUE, width = "35%"),
+              shiny::actionButton("selectoverlay", "Select Climate Overlay", class = "btn btn-primary btn-sm", width = "62%"),
+              shiny::actionButton("downloadoverlay", "Download", class = "btn btn-secondary btn-sm", disabled = TRUE, width = "36%", icon = shiny::icon("map")),
               shiny::sliderInput("opacity", "Overlay opacity", value = 80, min = 0, max = 100, step = 1, post = "%", ticks = FALSE),
               shiny::sliderInput("resolution", "Overlay resolution", value = 96, min = 24, max = 384, step = 12, post = "px", ticks = FALSE),
               shiny::div(style = "display: inline-flex; gap: 8px",
@@ -328,7 +329,7 @@ shiny::shinyApp(
             multiple = TRUE,
             selected = vstore[["downscale_run_nm"]]
           ),
-          shiny::selectInput(
+          shiny::selectizeInput(
             inputId = "downscale_core_vars",
             label = "Climate variables",
             width = "100%",
@@ -342,7 +343,6 @@ shiny::shinyApp(
           ),
         )
       )
-      session$sendCustomMessage(type="jsCode", list(code= "$('.modal-dialog.modal-xl').addClass('modal-dialog-scrollable');"))
     })
     shiny::observeEvent(input$downscale_which_refmap, {vstore[["downscale_which_refmap"]] <- input$downscale_which_refmap})
     shiny::observeEvent(input$downscale_obs_periods, {vstore[["downscale_obs_periods"]] <- input$downscale_obs_periods})
@@ -368,6 +368,7 @@ shiny::shinyApp(
         shiny::updateSelectInput(inputId = "downscale_run_nm", choices = climr::list_runs_ssp(gcm = gcms, ssp = ssps))
       }
     })
+    shiny::observeEvent(input$downscale_process, sg$process())
 
     # ---- Overlay events
     shiny::observeEvent(input$selectoverlay, {
@@ -396,7 +397,6 @@ shiny::shinyApp(
           )
         )
       )
-      session$sendCustomMessage(type="jsCode", list(code= "$('.modal-dialog.modal-xl').addClass('modal-dialog-scrollable');"))
     })
     shiny::observeEvent(input$tifsource, {
       vstore[["tifsource"]] <- input$tifsource
