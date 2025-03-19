@@ -4,3 +4,4 @@ BCGOV_MAPBOX_TOKEN="pk.eyJ1IjoibWV6dGV6IiwiYSI6ImNrbTlqcGRsbzFpcjUycHJ0aXhnNWVjc
 BCGOV_MAPBOX_LABELS_STYLE="meztez/ckm9qe3ts2g5w17qswd6qodjj"
 BCGOV_MAPBOX_HILLSHADE_STYLE="meztez/ckm9qzg1u2grj17n1qo25bt1r"
 CLIMR_TIF_URL="https://vonuma.com/climr-tif"
+ELEV_RASTER=/opt/elev/northamerica_elevation_cec_2023.tif

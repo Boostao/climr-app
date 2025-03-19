@@ -30,13 +30,16 @@ mbhsstyle <- Sys.getenv("BCGOV_MAPBOX_HILLSHADE_STYLE")
 pals <- readRDS("scripts/pals.rds")
 
 # Elevation raster for missing values
-elevtif <- "northamerica_elevation_cec_2023.tif"
-if (!file.exists(elevtif)) {
+elevtif <- c(Sys.getenv("ELEV_RASTER"), "northamerica_elevation_cec_2023.tif")
+if (!length(felev <- which(file.exists(elevtif)))) {
   curl::curl_download("http://www.cec.org/files/atlas_layers/0_reference/0_03_elevation/elevation_tif.zip", "elevation_tif.zip")
   unzip("elevation_tif.zip", files = "Elevation_TIF/NA_Elevation/data/northamerica/northamerica_elevation_cec_2023.tif", junkpaths = TRUE)
   unlink("elevation_tif.zip")
+  cec <- terra::rast("northamerica_elevation_cec_2023.tif")
+} else {
+  cec <- terra::rast(elevtif[felev])
 }
-cec <- terra::rast(elevtif)
+
 
 # Base map ----
 l <- leaflet::leaflet(
