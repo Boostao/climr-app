@@ -10,4 +10,6 @@ leaflet.extras
 leaflet
 shiny
 terra
+zip
+stringi
 boostao/climr@devl

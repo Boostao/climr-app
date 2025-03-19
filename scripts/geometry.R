@@ -290,27 +290,49 @@ session_geometry <- function() {
         warning = function(w) {shiny::showNotification(ui = shiny::span(conditionMessage(w)), type = "warning")},
         tryCatch(
           {
+ 
+            xyz <- create_points_dt(sg, cec, vstore[["downscale_resolution"]])
             n <- \(x) if (length(x) && !"NULL" %in% x) x
-            res <- climr::downscale(
+            res <- climr::downscale_db(
               xyz = xyz,
               which_refmap = vstore[["downscale_which_refmap"]],
               obs_periods = vstore[["downscale_obs_periods"]] |> n(),
               obs_years  = vstore[["downscale_obs_years "]] |> n(),
               obs_ts_dataset = vstore[["downscale_obs_ts_dataset"]] |> n(),
-              gcsm = vstore[["downscale_gcsm"]] |> n(),
+              gcms = vstore[["downscale_gcms"]] |> n(),
               ssps = vstore[["downscale_ssps"]] |> n(),
               gcm_periods = vstore[["downscale_gcm_periods"]] |> n(),
               gcm_ssp_years = vstore[["downscale_gcm_ssp_years"]] |> n(),
               gcm_hist_years = vstore[["downscale_gcm_hist_years"]] |> n(),
               max_run = vstore[["downscale_max_run"]] |> n(),
               run_nm = vstore[["downscale_run_nm"]] |> n(),
-              core_vars = vstore[["downscale_core_vars"]] |> n(),
-              core_ppt_lr = vstore[["downscale_core_ppt_lr"]],
-              cache = FALSE
+              vars = vstore[["downscale_core_vars"]] |> n(),
+              ppt_lr = vstore[["downscale_core_ppt_lr"]]
             )
-            output$downscale_download <<- shiny::downloadHandler(
-              filename = function() tempfile("downscale_", fileext = ".zip"),
-              content = function(file) {},
+
+            browser()
+
+            # Generate run_id once
+            run_id <- generate_run_id()
+
+            output$downscale_download <- shiny::downloadHandler(
+              filename = function() {
+                paste0("downscale_", run_id, ".zip")
+              },
+              content = function(file) {
+                # Create temporary directory
+                temp_dir <- tempdir()
+                
+                # Write the current res to CSV using the same run_id
+                csv_file <- file.path(temp_dir, paste0("downscale_", run_id, ".csv"))
+                data.table::fwrite(res, csv_file, row.names = FALSE)
+                
+                # List of files to zip
+                files_to_zip <- csv_file
+                
+                # Create ZIP file
+                zip::zipr(file, files_to_zip)
+              },
               contentType = "application/zip"
             )
           },
@@ -332,6 +354,30 @@ session_geometry <- function() {
     add_point_enabled = function(val) {
       if (missing(val)) return(click_enabled)
       else click_enabled <<- val
+    },
+    approx_count = function(resolution = 2500) {
+      marker_idx <- which(sg$group == "marker")
+      shape_idx <- which(sg$group == "shape")
+    
+      approx_pts_shape <- vapply(
+        sg[group == "shape", wkt],
+        \(x) {
+          area <- terra::vect(x, crs = "EPSG:4326") |>
+            terra::expanse("m")
+          floor(area / (resolution ^ 2))
+        },
+        FUN.VALUE = numeric(1),
+        USE.NAMES = FALSE
+      ) |> sum(na.rm = TRUE)
+      
+      return(
+        list(
+          marker = length(marker_idx),
+          marker_count = length(marker_idx),
+          shape = approx_pts_shape,
+          shape_count = length(shape_idx)
+        )
+      )
     }
   )
   return(sg_methods)

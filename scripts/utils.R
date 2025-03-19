@@ -137,6 +137,7 @@ labelf <- function(fcontent) {
 
 # Tiles source
 climr_tif <- url_process(Sys.getenv("CLIMR_TIF_URL"))
+climr_ratios <- climr::variables[Type %in% "ratio", c(Code, Code_ClimateNA) |> unique() |> sort()]
 
 # Map tiles provider for BGC + vector tiles ----
 
@@ -184,6 +185,8 @@ add_custom_render <- function(map) {
             }
           },
           pane : lfPane,
+          maxZoom : 25,
+          maxNativeZoom : 17,
           getFeatureId: function(f) {
               return f.properties[id];
           }
@@ -208,7 +211,7 @@ add_custom_render <- function(map) {
       var updateOpacity=function(message) {
         var prefixedLayerId = map.layerManager._layerIdKey(message.category, message.layerId);
         var layer = map.layerManager._byLayerId[prefixedLayerId];
-        if (layer.setOpacity) {
+        if (layer !== undefined) {
           layer.setOpacity(message.opacity);
         }
       }
@@ -216,30 +219,38 @@ add_custom_render <- function(map) {
       var updateResolution=function(message) {
         var prefixedLayerId = map.layerManager._layerIdKey(message.category, message.layerId);
         var layer = map.layerManager._byLayerId[prefixedLayerId];
-        const resolution = message.resolution;
-        layer.options.resolution = resolution;
-        layer.redraw();
+        if (layer !== undefined) {
+          const resolution = message.resolution;
+          layer.options.resolution = resolution;
+          layer.redraw();
+        }
       }
 
       var updateClimatePalette=function(message) {
         var prefixedLayerId = map.layerManager._layerIdKey(message.category, message.layerId);
-        var colorOptions = message.colorOptions;
         var layer = map.layerManager._byLayerId[prefixedLayerId];
-        var georaster = layer.options.georaster;
-
-        const cols = colorOptions.palette;
-        let scale = chroma.scale(cols);
-        let domain = [georaster.mins[0], georaster.maxs[0]];
-        let nacol = colorOptions["na.color"];
-        pixelValuesToColorFn = values => {
-          let vals;
-          vals = values[0];
-          let clr = scale.domain(domain);
-          if (isNaN(vals) || vals === georaster.noDataValue) return nacol;
-          return clr(vals).hex();
-        };
-        layer.options.pixelValuesToColorFn = pixelValuesToColorFn;
-        layer.redraw();
+        if (layer !== undefined) {
+            var georaster = layer.options.georaster;
+            var colorOptions = message.colorOptions;
+            var vscale = message.vscale;
+      
+            const cols = colorOptions.palette;
+            let scale = chroma.scale(cols);
+            debugger;
+            let domain = (vscale === "log") 
+                ? [Math.log(georaster.mins[0]), Math.log(georaster.maxs[0])]
+                : [georaster.mins[0], georaster.maxs[0]];
+            let nacol = colorOptions["na.color"];
+            pixelValuesToColorFn = values => {
+                let vals = values[0];
+                if (isNaN(vals) || vals === georaster.noDataValue) return nacol;
+                let processedVals = (scale === "log") ? Math.log(vals) : vals;
+                let clr = scale.domain(domain);
+                return clr(processedVals).hex();
+            };
+            layer.options.pixelValuesToColorFn = pixelValuesToColorFn;
+            layer.redraw();
+        }
       }
 
       Shiny.addCustomMessageHandler(\'updateOpacity\', updateOpacity);
@@ -289,4 +300,94 @@ report_msg <- function(msgs, type = c("info", "danger")) {
       easyClose = TRUE
   ))
 
+}
+
+# Function to generate random run number with compressed timestamp
+generate_run_id <- function() {
+  # Define character set (A-Z, 0-9)
+  chars <- c(65:90, 48:57) # ASCII codes for A-Z and 0-9
+  # Sample 8 random characters and convert to string
+  run_num <- rawToChar(as.raw(sample(chars, 8, replace = TRUE)))
+  # Get compressed timestamp (YYYYMMDDHHMM)
+  timestamp <- format(Sys.time(), "%Y%m%d%H%M")
+  # Combine with underscore
+  paste0(run_num, "_", timestamp)
+}
+
+# Albers Equal Area CRS (meters-based)
+albers_crs <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m"
+
+create_points_dt <- function(sg, cec, resolution) {
+
+  # Initialize output data.table
+  out_dt <- data.table(sg_id = integer(), id = integer(), lon = numeric(), lat = numeric(), elev = numeric())
+
+  # Split indices by group
+  marker_idx <- which(sg$group == "marker")
+  shape_idx <- which(sg$group == "shape")
+  
+  # Process markers
+  if (length(marker_idx) > 0) {
+    marker_geoms <- terra::vect(sg$wkt[marker_idx], crs = "EPSG:4326")
+    coords <- terra::crds(marker_geoms)
+    elevs <- terra::extract(cec, marker_geoms, method = "bilinear", ID = FALSE, raw = TRUE)[,1]
+    
+    marker_dt <- data.table(
+      sg_id = sg$id[marker_idx],
+      id = 1,
+      lon = coords[, 1],
+      lat = coords[, 2],
+      elev = elevs
+    )
+  } else {
+    market_dt <- data.table::data.table()
+  }
+  
+  # Process shapes
+  if (length(shape_idx) > 0) {
+    shape_geoms <- terra::vect(sg$wkt[shape_idx], crs = "EPSG:4326")
+    shape_geoms_albers <- terra::project(shape_geoms, albers_crs)
+    
+    # Generate grid for each shape in Albers (meters)
+    grid_list <- lapply(seq_along(shape_idx), function(i) {
+      extents_albers <- terra::ext(shape_geoms_albers[i])
+      xmin <- extents_albers$xmin
+      xmax <- extents_albers$xmax
+      ymin <- extents_albers$ymin
+      ymax <- extents_albers$ymax
+      x_seq <- seq(xmin, xmax, by = c(1,-1)[(xmax < xmin) + 1] * resolution)
+      y_seq <- seq(ymin, ymax, by = c(1,-1)[(ymax < ymin) + 1] * resolution)
+      grid_dt <- expand.grid(x = x_seq, y = y_seq)
+      # Convert to SpatVector in Albers
+      grid_vect_albers <- terra::vect(as.matrix(grid_dt[, c("x", "y")]), crs = albers_crs)
+      # Check which points are within their respective polygons
+      pts_within <- terra::is.related(grid_vect_albers, shape_geoms_albers[i], "within")
+      grid_valid_albers <- grid_vect_albers[which(pts_within)]
+      if (length(grid_valid_albers) > 0) {
+        # Convert back to WGS84 (EPSG:4326)
+        grid_vect_wgs84 <- terra::project(grid_valid_albers, "EPSG:4326")
+        coords_wgs84 <- terra::crds(grid_vect_wgs84)
+        # Extract elevations
+        elevs <- terra::extract(cec, grid_vect_wgs84, method = "bilinear", ID = FALSE, raw = TRUE)[,1]
+        # Create output for shapes
+        shape_dt <- data.table(
+          sg_id = sg$id[shape_idx[i]],
+          id = 1,
+          lon = coords_wgs84[, 1],
+          lat = coords_wgs84[, 2],
+          elev = elevs
+        )
+        return(shape_dt)
+      }
+      return(data.table::data.table())
+    })
+
+  } else {
+    grid_list <- list(data.table::data.table())
+  }
+    
+  # Combine all grids and track original shape index
+  out_dt <- data.table::rbindlist(c(list(out_dt, marker_dt), grid_list), use.names = TRUE)
+  data.table::set(out_dt, j = "id", value = seq_len(nrow(out_dt)))
+  return(out_dt)
 }

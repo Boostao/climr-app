@@ -14,6 +14,7 @@ suppressPackageStartupMessages({
   library(shiny)
   library(terra)
   library(climr)
+  library(zip)
   source("scripts/utils.R", local = TRUE)
 })
 
@@ -28,33 +29,44 @@ mbhsstyle <- Sys.getenv("BCGOV_MAPBOX_HILLSHADE_STYLE")
 
 pals <- readRDS("scripts/pals.rds")
 
+# Elevation raster for missing values
+elevtif <- "northamerica_elevation_cec_2023.tif"
+if (!file.exists(elevtif)) {
+  curl::curl_download("http://www.cec.org/files/atlas_layers/0_reference/0_03_elevation/elevation_tif.zip", "elevation_tif.zip")
+  unzip("elevation_tif.zip", files = "Elevation_TIF/NA_Elevation/data/northamerica/northamerica_elevation_cec_2023.tif", junkpaths = TRUE)
+  unlink("elevation_tif.zip")
+}
+cec <- terra::rast(elevtif)
+
 # Base map ----
-l <- leaflet::leaflet() |>
+l <- leaflet::leaflet(
+    options = leaflet::leafletOptions(maxZoom = 25)
+  ) |>
   # base layer
   leaflet::addProviderTiles(
     provider = leaflet::providers$CartoDB.PositronNoLabels,
-    options = leaflet::pathOptions(pane = "mapPane"),
+    options = leaflet::pathOptions(pane = "mapPane", maxZoom = 25, maxNativeZoom = 20),
     group = "Light"
   ) |>
   leaflet::addProviderTiles(
     provider = leaflet::providers$CartoDB.DarkMatterNoLabels, 
-    options = leaflet::pathOptions(pane = "mapPane"),
+    options = leaflet::pathOptions(pane = "mapPane", maxZoom = 25, maxNativeZoom = 20),
     group = "Dark"
   ) |>
   leaflet::addProviderTiles(
     provider = leaflet::providers$Esri.WorldImagery, 
-    options = leaflet::pathOptions(pane = "mapPane"),
+    options = leaflet::pathOptions(pane = "mapPane", maxZoom = 25, maxNativeZoom = 18),
     group = "Satellite"
   ) |>
   leaflet::addProviderTiles(
     provider = leaflet::providers$OpenStreetMap, 
-    options = leaflet::pathOptions(pane = "mapPane"),
+    options = leaflet::pathOptions(pane = "mapPane", maxZoom = 25, maxNativeZoom = 20),
     group = "OpenStreetMap"
   ) |>
   leaflet::addTiles(
     urlTemplate = paste0("https://api.mapbox.com/styles/v1/", mbhsstyle, "/tiles/{z}/{x}/{y}?access_token=", mbtk),
     attribution = '&#169; <a href="https://www.mapbox.com/feedback/">Mapbox</a>',
-    options = leaflet::pathOptions(pane = "mapPane"),
+    options = leaflet::pathOptions(pane = "mapPane", maxZoom = 25, maxNativeZoom = 22),
     group = "Hillshade",
 
   ) |>
@@ -62,7 +74,7 @@ l <- leaflet::leaflet() |>
   leaflet::addTiles(
     urlTemplate = paste0("https://api.mapbox.com/styles/v1/", mblbstyle, "/tiles/{z}/{x}/{y}?access_token=", mbtk),
     attribution = '&#169; <a href="https://www.mapbox.com/feedback/">Mapbox</a>',
-    options = leaflet::pathOptions(pane = "overlayPane"),
+    options = leaflet::pathOptions(pane = "overlayPane", maxZoom = 25, maxNativeZoom = 22),
     group = "Labels"
   ) |>
   add_custom_render() |>
@@ -123,23 +135,93 @@ shiny::shinyApp(
             class = "input-control",
             shiny::div(class = "input-control-header", shiny::h4("Controls")),
             shiny::div(class = "input-control-body",
-              shiny::fileInput("upload", "Upload geometry or raster file"),
+              shiny::div(
+                title = "Upload a csv, a raster or a shape file to add geographies",
+                shiny::fileInput(
+                  inputId = "upload",
+                  label = "Upload geometry or raster file"
+                )
+              ),
               # Downscale parameters
-              shiny::actionButton("downscale_parameters", "Downscale Parameters", class = "btn btn-primary btn-sm", width = "62%"),  
-              shiny::actionButton("downscale_process", label = "", class = "btn btn-secondary btn-sm", icon = shiny::icon("gear"), width = "17%", disabled = TRUE),
-              shiny::downloadButton("downscale_download", label = "", class = "btn btn-secondary btn-sm"),
+              shiny::actionButton(
+                inputId = "downscale_parameters",
+                label = "Downscale Parameters",
+                title = "Open advanced downscale parameters selection",
+                class = "btn btn-primary btn-sm",
+                width = "62%"
+              ),  
+              shiny::actionButton(
+                inputId = "downscale_process",
+                label = "",
+                title = "Open downscale process launch window with currently active geographies",
+                class = "btn btn-secondary btn-sm", icon = shiny::icon("gear"), width = "17%", disabled = TRUE),
+              shiny::downloadButton(
+                outputId = "downscale_download",
+                label = "",
+                title = "Download downscaled geographies archive",
+                class = "btn btn-secondary btn-sm"
+              ),
               # Overlay parameters
               shiny::hr(),
-              shiny::actionButton("selectoverlay", "Select Climate Overlay", class = "btn btn-primary btn-sm", width = "62%"),
-              shiny::actionButton("downloadoverlay", "Download", class = "btn btn-secondary btn-sm", disabled = TRUE, width = "36%", icon = shiny::icon("map")),
-              shiny::sliderInput("opacity", "Overlay opacity", value = 80, min = 0, max = 100, step = 1, post = "%", ticks = FALSE),
-              shiny::sliderInput("resolution", "Overlay resolution", value = 96, min = 24, max = 384, step = 12, post = "px", ticks = FALSE),
-              shiny::div(style = "display: inline-flex; gap: 8px",
-                shiny::selectizeInput(
-                  "palette", label = NULL, choices = pals$select, selected = "Roma", width = "225px",
-                  options = list(render = I('{option: function(item, escape) {return item.label;},item: function(item, escape) {return item.label;}}'))
+              shiny::actionButton(
+                inputId = "selectoverlay",
+                label = "Select Climate Overlay",
+                title = "Open map climate overlay selection",
+                class = "btn btn-primary btn-sm",
+                width = "62%"
+              ),
+              shiny::actionButton(
+                inputId = "downloadoverlay",
+                label = "Download",
+                title = "Download currently active overlay raster (tif)",
+                class = "btn btn-secondary btn-sm",
+                disabled = TRUE,
+                width = "36%",
+                icon = shiny::icon("map")
+              ),
+              shiny::div(
+                title = "Adjust the opacity of the currently active overlay",
+                shiny::sliderInput(
+                  inputId = "opacity",
+                  label = "Overlay opacity",
+                  value = 80,
+                  min = 0,
+                  max = 100,
+                  step = 1,
+                  post = "%",
+                  ticks = FALSE
                 ),
-                shiny::checkboxInput("inverse", "Invert", width = "72px")
+              ),
+              shiny::tags$div(
+                title = "Adjust the resolution of the currently active overlay",
+                shiny::sliderInput(
+                  inputId = "resolution",
+                  label = "Overlay resolution",
+                  value = 96,
+                  min = 24,
+                  max = 384,
+                  step = 12,
+                  post = "px",
+                  ticks = FALSE
+                )
+              ),
+              shiny::div(
+                style = "display: inline-flex; gap: 8px",
+                shiny::div(
+                  title = "Adjust color palette of the currently active overlay",
+                  shiny::selectizeInput(
+                    inputId = "palette",
+                    label = NULL,
+                    choices = pals$select,
+                    selected = "Roma",
+                    width = "225px",
+                    options = list(render = I('{option: function(item, escape) {return item.label;},item: function(item, escape) {return item.label;}}'))
+                  )
+                ),
+                shiny::div(
+                  title = "Invert color palette value association of the currently active overlay",
+                  shiny::checkboxInput("inverse", "Invert", width = "72px")
+                )
               )
             )           
           )
@@ -212,15 +294,18 @@ shiny::shinyApp(
       downscale_obs_periods = "NULL",
       downscale_obs_years = c(),
       downscale_obs_ts_dataset = "NULL",
-      downscale_gcsm = c(),
+      downscale_gcms = c(),
       downscale_ssps = c(),
       downscale_gcm_periods = c(),
       downscale_gcm_ssp_years = c(),
       downscale_gcm_hist_years = c(),
-      downscale_max_run = 0L,
+      downscale_max_run = 0,
       downscale_run_nm = c(),
       downscale_core_vars = sort(sprintf(c("PPT_%02d", "Tmax_%02d", "Tmin_%02d"), sort(rep(1:12, 3)))),
-      downscale_core_ppt_lr = FALSE
+      downscale_core_ppt_lr = FALSE,
+      downscale_output = "csv",
+      downscale_resolution = 2500,
+      vscale = ""
     )
     
     # ---- Geometry
@@ -228,13 +313,14 @@ shiny::shinyApp(
     sg <- session_geometry()
 
     # ---- Map events
-    shiny::observeEvent(input$climr_draw_start,       sg$add_point_enabled(FALSE))
-    shiny::observeEvent(input$climr_draw_stop,        sg$add_point_enabled(TRUE))
-    shiny::observeEvent(input$climr_draw_new_feature, sg$add_draw_poly(input$climr_draw_new_feature))
-    shiny::observeEvent(input$climr_click,            sg$add_point(input$climr_click$lat, input$climr_click$lng))
-    shiny::observeEvent(input$upload,                 sg$add_file(input$upload))
-    shiny::observeEvent(input$sg_remove,              sg$rm(input$sg_remove))
-    shiny::observeEvent(input$sg_view,                sg$view(input$sg_view))
+    shiny::observeEvent(input$climr_draw_start,         sg$add_point_enabled(FALSE))
+    shiny::observeEvent(input$climr_draw_stop,          sg$add_point_enabled(TRUE))
+    shiny::observeEvent(input$climr_draw_new_feature,   sg$add_draw_poly(input$climr_draw_new_feature))
+    shiny::observeEvent(input$climr_click,              sg$add_point(input$climr_click$lat, input$climr_click$lng))
+    shiny::observeEvent(input$upload,                   sg$add_file(input$upload))
+    shiny::observeEvent(input$sg_remove,                sg$rm(input$sg_remove))
+    shiny::observeEvent(input$sg_view,                  sg$view(input$sg_view))
+    shiny::observeEvent(input$downscale_process_launch, sg$process())
 
     # ---- Downscale events
     shiny::observeEvent(input$downscale_parameters, {
@@ -274,12 +360,12 @@ shiny::shinyApp(
             choices = c("Null" = "NULL", "ClimateNA" = "climatena", "Climatic Research Unit / Global Precipitation Climatology Centre" = "cru.gpcc")
           ),
           shiny::selectInput(
-            inputId = "downscale_gcsm",
+            inputId = "downscale_gcms",
             label = "Global climate model",
             width = "100%",
             choices = climr::list_gcms(),
             multiple = TRUE,
-            selected = vstore[["downscale_gcsm"]]
+            selected = vstore[["downscale_gcms"]]
           ),
           shiny::selectInput(
             inputId = "downscale_ssps",
@@ -348,7 +434,7 @@ shiny::shinyApp(
     shiny::observeEvent(input$downscale_obs_periods, {vstore[["downscale_obs_periods"]] <- input$downscale_obs_periods})
     shiny::observeEvent(input$downscale_obs_years, {vstore[["downscale_obs_years"]] <- input$downscale_obs_years})
     shiny::observeEvent(input$downscale_obs_ts_dataset, {vstore[["downscale_obs_ts_dataset"]] <- input$downscale_obs_ts_dataset})
-    shiny::observeEvent(input$downscale_gcsm, {vstore[["downscale_gcsm"]] <- input$downscale_gcsm})
+    shiny::observeEvent(input$downscale_gcms, {vstore[["downscale_gcms"]] <- input$downscale_gcms})
     shiny::observeEvent(input$downscale_ssps, {vstore[["downscale_ssps"]] <- input$downscale_ssps})
     shiny::observeEvent(input$downscale_gcm_periods, {vstore[["downscale_gcm_periods"]] <- input$downscale_gcm_periods})
     shiny::observeEvent(input$downscale_gcm_ssp_years, {vstore[["downscale_gcm_ssp_years"]] <- input$downscale_gcm_ssp_years})
@@ -358,7 +444,7 @@ shiny::shinyApp(
     shiny::observeEvent(input$downscale_core_vars, {vstore[["downscale_core_vars"]] <- input$downscale_core_vars})
     shiny::observeEvent(input$downscale_core_ppt_lr, {vstore[["downscale_core_ppt_lr"]] <- input$downscale_core_ppt_lr})
     shiny::observe({
-      gcms <- vstore[["downscale_gcsm"]]
+      gcms <- vstore[["downscale_gcms"]]
       ssps <- vstore[["downscale_ssps"]]
       if (!length(gcms) && !length(ssps)) {
         shiny::updateSelectInput(inputId = "downscale_run_nm", choices = c())
@@ -368,7 +454,64 @@ shiny::shinyApp(
         shiny::updateSelectInput(inputId = "downscale_run_nm", choices = climr::list_runs_ssp(gcm = gcms, ssp = ssps))
       }
     })
-    shiny::observeEvent(input$downscale_process, sg$process())
+    shiny::observeEvent(input$downscale_process, {
+      output$downscale_points_count_estimate <- shiny::renderUI({
+        pce <- sg$approx_count(vstore[["downscale_resolution"]])
+        bslib::card(
+          full_screen = FALSE,
+          height = "auto",
+          bslib::card_header("Load estimation"),
+          class = "bg-warning",
+          fill = TRUE,
+          bslib::card_body(
+            shiny::tags$span(
+              if (pce$marker_count > 0) "[%s] point geometries from [%s] markers." |> sprintf(format(pce$marker, big.mark = ","), format(pce$marker_count, big.mark = ",")),
+              shiny::br(),
+              if (pce$shape_count > 0) "[%s] point geometries from [%s] shapes (approximate using resolution)." |> sprintf(format(pce$shape, big.mark = ","), format(pce$shape_count, big.mark = ","))
+            )
+          )
+        )
+      })
+      shiny::showModal(
+        shiny::modalDialog(
+          title = "Preferences for Downscale Processing", size = "l", easyClose = TRUE, fade = FALSE,
+          shiny::div(
+            title = "csv: all points are returned in csv. tif: Only shapes/rasters are returned as GeoTIFF if selected.",
+            shiny::radioButtons(
+              inputId = "downscale_output",
+              label =  "Downscale Output Format", c("Comma Separated Value (csv)" = "csv", "Geographic Tag Image File Format (GeoTIFF)" = "tif"),
+              inline = TRUE,
+              selected = vstore[["downscale_output"]]
+            )
+          ),
+          div(
+            title = "Target resolution for shapes drawn on map or added using file upload. Does not apply to points, raster or csv files.",
+            shiny::sliderInput(
+              inputId = "downscale_resolution",
+              label = "Downscale Resolution (m)",
+              value = vstore[["downscale_resolution"]],
+              width = "100%",
+              min = 250,
+              max = 50000,
+              step = 250,
+              post = "m",
+              ticks = FALSE
+            )
+          ),
+          shiny::uiOutput("downscale_points_count_estimate"),
+          shiny::actionButton(
+            inputId = "downscale_process_launch",
+            label = "Launch Downscale Process",
+            title = "Trigger a downscale processing run. At the end of the run, the download button on the main control panel will be enabled.",
+            class = "btn btn-primary btn-lg",
+            icon = shiny::icon("robot"),
+            width = "100%"
+          ),
+        )
+      )
+    })
+    shiny::observeEvent(input$downscale_output, {vstore[["downscale_output"]] <- input$downscale_output})
+    shiny::observeEvent(input$downscale_resolution, {vstore[["downscale_resolution"]] <- input$downscale_resolution})
 
     # ---- Overlay events
     shiny::observeEvent(input$selectoverlay, {
@@ -421,22 +564,29 @@ shiny::shinyApp(
       if ("NONE" %in% vstore[["climatevar"]] | 0 == input$opacity) return()
       shiny::updateActionButton(inputId = "downloadoverlay", disabled = FALSE)
       prefix <- vstore[["climatevar"]] |> basename() |> tools::file_path_sans_ext()
-      mp |> leafem::addGeotiff(      
+      fpal <- if (isTRUE(input$inverse)) rev else identity
+      mp |> leafem::addGeotiff(
         url = vstore[["climatevar"]],
         group = "Climate",
         layerId = "val",
         project = FALSE,
         opacity = input$opacity / 100,
         colorOptions = leafem::colorOptions(
-          palette = pals$colors[[input$palette]] |> {if (input$inverse) rev else identity}(),
+          palette = pals$colors[[input$palette]] |> fpal(),
           na.color = "transparent"
         ),
         imagequery = TRUE,
         imagequeryOptions = leafem::imagequeryOptions(
           prefix = prefix
         ),
-        autozoom = FALSE
+        autozoom = FALSE,
+        options = leaflet::tileOptions(maxZoom = 25, maxNativeZoom = 20)
       ) |> leaflet::showGroup("Climate")
+      if (prefix %in% climr_ratios) {
+        vstore[["vscale"]] <- "log"
+      } else {
+        vstore[["vscale"]] <- ""
+      }
       shiny::showNotification("Rendering %s values" |> sprintf(prefix), duration = 5)
     })
     shiny::observeEvent(input$opacity, {
@@ -455,7 +605,7 @@ shiny::shinyApp(
     shiny::observe({
       fpal <- if (isTRUE(input$inverse)) rev else identity
       session$sendCustomMessage(type="updateClimatePalette", list(
-        category = "image", layerId = "val", colorOptions = leafem::colorOptions(
+        category = "image", layerId = "val", vscale = vstore[["vscale"]], colorOptions = leafem::colorOptions(
           palette = pals$colors[[input$palette]] |> fpal(),
           na.color = "transparent"
         )
