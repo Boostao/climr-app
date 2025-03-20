@@ -226,26 +226,26 @@ add_custom_render <- function(map) {
         }
       }
 
+      
+
       var updateClimatePalette=function(message) {
         var prefixedLayerId = map.layerManager._layerIdKey(message.category, message.layerId);
         var layer = map.layerManager._byLayerId[prefixedLayerId];
         if (layer !== undefined) {
             var georaster = layer.options.georaster;
             var colorOptions = message.colorOptions;
-            var vscale = message.vscale;
+            var scaleFunc = ({log: Math.log, log10: Math.log10, log1p: Math.log1p, log2: Math.log2}[message.vscale] || (x => x));
       
             const cols = colorOptions.palette;
             let scale = chroma.scale(cols);
-            debugger;
-            let domain = (vscale === "log") 
-                ? [Math.log(georaster.mins[0]), Math.log(georaster.maxs[0])]
-                : [georaster.mins[0], georaster.maxs[0]];
+            let domain = [scaleFunc(georaster.mins[0]), scaleFunc(georaster.maxs[0])];
             let nacol = colorOptions["na.color"];
+            let clr = scale.domain(domain);
+            console.log(message.vscale);
             pixelValuesToColorFn = values => {
                 let vals = values[0];
                 if (isNaN(vals) || vals === georaster.noDataValue) return nacol;
-                let processedVals = (scale === "log") ? Math.log(vals) : vals;
-                let clr = scale.domain(domain);
+                let processedVals = scaleFunc(vals);
                 return clr(processedVals).hex();
             };
             layer.options.pixelValuesToColorFn = pixelValuesToColorFn;

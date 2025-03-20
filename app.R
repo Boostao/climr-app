@@ -586,12 +586,19 @@ shiny::shinyApp(
         ),
         autozoom = FALSE,
         options = leaflet::tileOptions(maxZoom = 25, maxNativeZoom = 20)
-      ) |> leaflet::showGroup("Climate")
+      )
       if (prefix %in% climr_ratios) {
-        vstore[["vscale"]] <- "log"
+        vstore[["vscale"]] <- "log2"
       } else {
         vstore[["vscale"]] <- ""
       }
+      session$sendCustomMessage(type="updateClimatePalette", list(
+        category = "image", layerId = "val", vscale = vstore[["vscale"]], colorOptions = leafem::colorOptions(
+          palette = pals$colors[[input$palette]] |> fpal(),
+          na.color = "transparent"
+        )
+      ))
+      mp |> leaflet::showGroup("Climate")
       shiny::showNotification("Rendering %s values" |> sprintf(prefix), duration = 5)
     })
     shiny::observeEvent(input$opacity, {
