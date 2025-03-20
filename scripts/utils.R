@@ -340,7 +340,7 @@ create_points_dt <- function(sg, cec, resolution) {
       elev = elevs
     )
   } else {
-    market_dt <- data.table::data.table()
+    marker_dt <- data.table::data.table()
   }
   
   # Process shapes

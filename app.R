@@ -295,7 +295,7 @@ shiny::shinyApp(
       temporality = "Annual",
       tifsource = names(climr_tif) |> head(1),
       climatevar = "NONE",
-      downscale_which_refmap = "auto",
+      downscale_which_refmap = "refmap_climr",
       downscale_obs_periods = "2001_2020",
       downscale_obs_years = c(),
       downscale_obs_ts_dataset = "NULL",
@@ -337,7 +337,6 @@ shiny::shinyApp(
             label =  "Reference Map",
             width = "100%",
             choices = c(
-              list("Auto" = "auto"),
               local({z <- climr::list_refmaps(); substr(z, 8L, z |> nchar()) |> tools::toTitleCase() |> setNames(object = z, nm = _)})
             ),
             selected = vstore[["downscale_which_refmap"]]
