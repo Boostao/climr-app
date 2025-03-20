@@ -148,16 +148,17 @@ shiny::shinyApp(
               # Downscale parameters
               shiny::actionButton(
                 inputId = "downscale_parameters",
-                label = "Downscale Parameters",
+                label = "Downscale Options",
                 title = "Open advanced downscale parameters selection",
                 class = "btn btn-primary btn-sm",
+                icon = shiny::icon("gear"),
                 width = "62%"
               ),  
               shiny::actionButton(
                 inputId = "downscale_process",
                 label = "",
                 title = "Open downscale process launch window with currently active geographies",
-                class = "btn btn-secondary btn-sm", icon = shiny::icon("gear"), width = "17%", disabled = TRUE),
+                class = "btn btn-secondary btn-sm", icon = shiny::icon("play"), width = "17%", disabled = TRUE),
               shiny::downloadButton(
                 outputId = "downscale_download",
                 label = "",
@@ -168,9 +169,10 @@ shiny::shinyApp(
               shiny::hr(),
               shiny::actionButton(
                 inputId = "selectoverlay",
-                label = "Select Climate Overlay",
+                label = "Select Overlay",
                 title = "Open map climate overlay selection",
                 class = "btn btn-primary btn-sm",
+                icon = shiny::icon("droplet"),
                 width = "62%"
               ),
               shiny::actionButton(
@@ -294,7 +296,7 @@ shiny::shinyApp(
       tifsource = names(climr_tif) |> head(1),
       climatevar = "NONE",
       downscale_which_refmap = "auto",
-      downscale_obs_periods = "NULL",
+      downscale_obs_periods = "2001_2020",
       downscale_obs_years = c(),
       downscale_obs_ts_dataset = "NULL",
       downscale_gcms = c(),
@@ -507,7 +509,7 @@ shiny::shinyApp(
             label = "Launch Downscale Process",
             title = "Trigger a downscale processing run. At the end of the run, the download button on the main control panel will be enabled.",
             class = "btn btn-primary btn-lg",
-            icon = shiny::icon("robot"),
+            icon = shiny::icon("play"),
             width = "100%"
           ),
         )

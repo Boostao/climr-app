@@ -310,8 +310,6 @@ session_geometry <- function() {
               ppt_lr = vstore[["downscale_core_ppt_lr"]]
             )
 
-            browser()
-
             # Generate run_id once
             run_id <- generate_run_id()
 
