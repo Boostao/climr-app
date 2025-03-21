@@ -349,115 +349,154 @@ shiny::shinyApp(
       shiny::showModal(
         shiny::modalDialog(
           title = "Downscale Parameters", size = "xl", easyClose = TRUE, fade = FALSE, class = "modal-dialog-scrollable",
-          shiny::selectInput(
-            inputId = "downscale_which_refmap",
-            label =  "Reference Map",
-            width = "100%",
-            choices = c(
-              local({z <- climr::list_refmaps(); substr(z, 8L, z |> nchar()) |> tools::toTitleCase() |> setNames(object = z, nm = _)})
-            ),
-            selected = vstore[["downscale_which_refmap"]]
+          shiny::div(
+            title = "Which map of 1961-1990 climatological normals to use as the high-resolution reference climate map for downscaling. 'auto' selects the best available map per point.",
+            shiny::selectInput(
+              inputId = "downscale_which_refmap",
+              label = "Reference Map",
+              width = "100%",
+              choices = c(
+                local({z <- climr::list_refmaps(); substr(z, 8L, z |> nchar()) |> tools::toTitleCase() |> setNames(object = z, nm = _)})
+              ),
+              selected = vstore[["downscale_which_refmap"]]
+            )
           ),
-          shiny::selectInput(
-            inputId = "downscale_obs_periods",
-            label =  "Observation periods",
-            width = "100%",
-            choices = c("Null" = "NULL", climr::list_obs_periods()),
-            selected = vstore[["downscale_obs_periods"]]
+          shiny::div(
+            title = "Historical period for observational climate data, averaged over this period. Select 'Null' for no observational periods.",
+            shiny::selectInput(
+              inputId = "downscale_obs_periods",
+              label = "Observation periods",
+              width = "100%",
+              choices = c("Null" = "NULL", climr::list_obs_periods()),
+              selected = vstore[["downscale_obs_periods"]]
+            )
           ),
-          shiny::selectInput(
-            inputId = "downscale_obs_years",
-            label = "Observation years",
-            width = "100%",
-            choices = climr::list_obs_years(),
-            multiple = TRUE,
-            selected = vstore[["downscale_obs_years"]]
+          shiny::div(
+            title = "Years to obtain individual years or time series of observational climate data.",
+            shiny::selectInput(
+              inputId = "downscale_obs_years",
+              label = "Observation years",
+              width = "100%",
+              choices = climr::list_obs_years(),
+              multiple = TRUE,
+              selected = vstore[["downscale_obs_years"]]
+            )
           ),
-          shiny::selectInput(
-            inputId = "downscale_obs_ts_dataset",
-            label = "Observation time-series data",
-            width = "100%",
-            selected = vstore[["downscale_obs_ts_dataset"]],
-            choices = c("Null" = "NULL", "ClimateNA" = "climatena", "Climatic Research Unit / Global Precipitation Climatology Centre" = "cru.gpcc")
+          shiny::div(
+            title = "Dataset for observational time series data. Options: 'climatena' for ClimateNA gridded time series, 'cru.gpcc' for CRU TS (temperature) and GPCC (precipitation), or 'Null' for none.",
+            shiny::selectInput(
+              inputId = "downscale_obs_ts_dataset",
+              label = "Observation time-series data",
+              width = "100%",
+              selected = vstore[["downscale_obs_ts_dataset"]],
+              choices = c("Null" = "NULL", "ClimateNA" = "climatena", "Climatic Research Unit / Global Precipitation Climatology Centre" = "cru.gpcc")
+            )
           ),
-          shiny::selectInput(
-            inputId = "downscale_gcms",
-            label = "Global climate model",
-            width = "100%",
-            choices = climr::list_gcms(),
-            multiple = TRUE,
-            selected = vstore[["downscale_gcms"]]
+          shiny::div(
+            title = "Global climate models to downscale. Select multiple GCMs for ensemble outputs.",
+            shiny::selectInput(
+              inputId = "downscale_gcms",
+              label = "Global climate model",
+              width = "100%",
+              choices = climr::list_gcms(),
+              multiple = TRUE,
+              selected = vstore[["downscale_gcms"]]
+            )
           ),
-          shiny::selectInput(
-            inputId = "downscale_ssps",
-            label = "Shared Socio-economic Pathways (SSP) - Representative Concentration Pathways (RCP) Scenarios",
-            width = "100%",
-            choices = climr::list_ssps(),
-            multiple = TRUE,
-            selected = vstore[["downscale_ssps"]]
+          shiny::div(
+            title = "SSP-RCP scenarios pairing shared socioeconomic pathways with representative concentration pathways.",
+            shiny::selectInput(
+              inputId = "downscale_ssps",
+              label = "Shared Socio-economic Pathways (SSP) - Representative Concentration Pathways (RCP) Scenarios",
+              width = "100%",
+              choices = climr::list_ssps(),
+              multiple = TRUE,
+              selected = vstore[["downscale_ssps"]]
+            )
           ),          
-          shiny::selectInput(
-            inputId = "downscale_gcm_periods",
-            label = "General Circulation Model (GCM) Periods",
-            width = "100%",
-            choices = climr::list_gcm_periods(),
-            multiple = TRUE,
-            selected = vstore[["downscale_gcm_periods"]]
+          shiny::div(
+            title = "20-year reference periods for GCM simulations.",
+            shiny::selectInput(
+              inputId = "downscale_gcm_periods",
+              label = "General Circulation Model (GCM) Periods",
+              width = "100%",
+              choices = climr::list_gcm_periods(),
+              multiple = TRUE,
+              selected = vstore[["downscale_gcm_periods"]]
+            )
           ),
-          shiny::selectInput(
-            inputId = "downscale_gcm_ssp_years",
-            label = "General circulation model (GCM) Shared Socio-economic Pathways (SSP) Years",
-            width = "100%",
-            choices = climr::list_gcm_ssp_years(),
-            multiple = TRUE,
-            selected = vstore[["downscale_gcm_ssp_years"]]
+          shiny::div(
+            title = "Time series years for GCM simulations of future SSP scenarios.",
+            shiny::selectInput(
+              inputId = "downscale_gcm_ssp_years",
+              label = "General circulation model (GCM) Shared Socio-economic Pathways (SSP) Years",
+              width = "100%",
+              choices = climr::list_gcm_ssp_years(),
+              multiple = TRUE,
+              selected = vstore[["downscale_gcm_ssp_years"]]
+            )
           ),
-          shiny::selectInput(
-            inputId = "downscale_gcm_hist_years",
-            label = "General circulation model (GCM) Historical Years",
-            width = "100%",
-            choices = climr::list_gcm_hist_years(),
-            multiple = TRUE,
-            selected = vstore[["downscale_gcm_hist_years"]]
+          shiny::div(
+            title = "Time series years for GCM simulations of the historical scenario.",
+            shiny::selectInput(
+              inputId = "downscale_gcm_hist_years",
+              label = "General circulation model (GCM) Historical Years",
+              width = "100%",
+              choices = climr::list_gcm_hist_years(),
+              multiple = TRUE,
+              selected = vstore[["downscale_gcm_hist_years"]]
+            )
           ),
-          shiny::selectInput(
-            inputId = "downscale_max_run",
-            label = "Maximum number of model runs",
-            width = "100%",
-            choices = c("ensembleMean" = 0, 1:10),
-            multiple = FALSE,
-            selected = vstore[["downscale_max_run"]]
+          shiny::div(
+            title = "Maximum number of model runs to include. 0 returns only the ensemble mean.",
+            shiny::selectInput(
+              inputId = "downscale_max_run",
+              label = "Maximum number of model runs",
+              width = "100%",
+              choices = c("ensembleMean" = 0, 1:10),
+              multiple = FALSE,
+              selected = vstore[["downscale_max_run"]]
+            )
           ),
-          shiny::selectInput(
-            inputId = "downscale_run_nm",
-            label = "Name of specified runs",
-            width = "100%",
-            choices = {
-              gcms <- vstore[["downscale_gcms"]]
-              ssps <- vstore[["downscale_ssps"]]
-              if (!length(gcms) && !length(ssps)) {
-                c()
-              } else if (length(gcms) && !length(ssps)) {
-                climr::list_runs_historic(gcm = gcms)
-              } else if (length(gcms) && length(ssps)) {
-                climr::list_runs_ssp(gcm = gcms, ssp = ssps)
-              }
-            },
-            multiple = TRUE,
-            selected = vstore[["downscale_run_nm"]]
+          shiny::div(
+            title = "Names of specific runs to return instead of using max_run. Overrides max_run if specified.",
+            shiny::selectInput(
+              inputId = "downscale_run_nm",
+              label = "Name of specified runs",
+              width = "100%",
+              choices = {
+                gcms <- vstore[["downscale_gcms"]]
+                ssps <- vstore[["downscale_ssps"]]
+                if (!length(gcms) && !length(ssps)) {
+                  c()
+                } else if (length(gcms) && !length(ssps)) {
+                  climr::list_runs_historic(gcm = gcms)
+                } else if (length(gcms) && length(ssps)) {
+                  climr::list_runs_ssp(gcm = gcms, ssp = ssps)
+                }
+              },
+              multiple = TRUE,
+              selected = vstore[["downscale_run_nm"]]
+            )
           ),
-          shiny::selectizeInput(
-            inputId = "downscale_core_vars",
-            label = "Climate variables",
-            width = "100%",
-            choices = climr::list_vars(),
-            multiple = TRUE,
-            selected = vstore[["downscale_core_vars"]]
+          shiny::div(
+            title = "Climate variables to compute. Defaults to monthly PPT, Tmax, Tmin if not specified.",
+            shiny::selectizeInput(
+              inputId = "downscale_core_vars",
+              label = "Climate variables",
+              width = "100%",
+              choices = climr::list_vars(),
+              multiple = TRUE,
+              selected = vstore[["downscale_core_vars"]]
+            )
           ),
-          shiny::checkboxInput(
-            inputId = "downscale_core_ppt_lr",
-            label = "Precipitaion elevation adjustment",
-            value = vstore[["downscale_core_ppt_lr"]]
+          shiny::div(
+            title = "Apply elevation adjustment to precipitation values during downscaling.",
+            shiny::checkboxInput(
+              inputId = "downscale_core_ppt_lr",
+              label = "Precipitation elevation adjustment",
+              value = vstore[["downscale_core_ppt_lr"]]
+            )
           ),
           footer = shiny::tagList(
             shiny::actionButton(
