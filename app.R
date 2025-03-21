@@ -245,7 +245,24 @@ shiny::shinyApp(
         "About",
         "How to use",
         shiny::tabPanel("Map"),
-        shiny::tabPanel("Date")
+        shiny::tabPanel("Data"),
+        "climr package",
+        shiny::tabPanel(
+          title = "Documentation",
+          shiny::tags$iframe(
+            src = "https://bcgov.github.io/climr/reference/index.html",
+            style = "width: 100%; height: 90vh; border: none;",
+            seamless = "seamless"
+          )
+        ),
+        shiny::tabPanel(
+          title = "Articles",
+          shiny::tags$iframe(
+            src = "https://bcgov.github.io/climr/articles/index.html",
+            style = "width: 100%; height: 100vh; border: none;",
+            seamless = "seamless"
+          )
+        )
       ),
       header = list(
         shiny::includeCSS("www/style.css"),
@@ -342,7 +359,22 @@ shiny::shinyApp(
     shiny::observeEvent(input$upload,                   sg$add_file(input$upload))
     shiny::observeEvent(input$sg_remove,                sg$rm(input$sg_remove))
     shiny::observeEvent(input$sg_view,                  sg$view(input$sg_view))
-    shiny::observeEvent(input$downscale_process_launch, sg$process())
+    shiny::observeEvent(input$downscale_process_launch, {
+      shiny::showModal(
+        shiny::modalDialog(
+          title = "Processing",
+          shiny::tags$div(
+            class = "text-center",
+            shiny::tags$div(class = "spinner-border text-primary", role = "status"),
+            shiny::tags$p("Processing downscale... Please wait.")
+          ),
+          footer = NULL,
+          easyClose = TRUE
+        )
+      )
+      sg$process()
+      shiny::removeModal()
+    })
 
     # ---- Downscale events
     downscale_modal <- function() {
@@ -807,5 +839,5 @@ shiny::shinyApp(
       session$sendCustomMessage(type="jsCode", list(code = "window.location.assign('%s');" |> sprintf(vstore[["climatevar"]])))
     })
     
-  }
+    }
 )

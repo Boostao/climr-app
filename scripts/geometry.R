@@ -126,6 +126,7 @@ session_geometry <- function() {
     id <- max(c(0L,sg$id))+1L
     sg <<- rbind(sg, data.table::data.table(id = id, wkt = new, group = g, source = s, datapath = d))
     refresh(g)
+    session$sendCustomMessage(type="jsCode", list(code = "$('.input-control-body a.shiny-download-link').removeClass('btn-success');"))
   }
 
   rem <- function(rid) {
@@ -304,7 +305,7 @@ session_geometry <- function() {
               gcm_periods = vstore[["downscale_gcm_periods"]] |> n(),
               gcm_ssp_years = vstore[["downscale_gcm_ssp_years"]] |> n(),
               gcm_hist_years = vstore[["downscale_gcm_hist_years"]] |> n(),
-              max_run = vstore[["downscale_max_run"]] |> n(),
+              max_run = vstore[["downscale_max_run"]] |> n() |> as.integer(),
               run_nm = vstore[["downscale_run_nm"]] |> n(),
               vars = vstore[["downscale_core_vars"]] |> n(),
               ppt_lr = vstore[["downscale_core_ppt_lr"]]
@@ -333,6 +334,10 @@ session_geometry <- function() {
               },
               contentType = "application/zip"
             )
+
+            session$sendCustomMessage(type="jsCode", list(code = "$('.input-control-body a.shiny-download-link').addClass('btn-success');"))
+            shiny::showNotification("Downscale process completed. You can now download the results.", type = "message")
+
           },
           error = function(e) {
             report_msg(conditionMessage(e), type = "danger")
