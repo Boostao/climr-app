@@ -291,10 +291,8 @@ shiny::shinyApp(
 
     # ---- Modal input storage
     output$climr <- leaflet::renderLeaflet(l)
-    vstore <- reactiveValues(
-      temporality = "Annual",
-      tifsource = names(climr_tif) |> head(1),
-      climatevar = "NONE",
+
+    downscale_default <- list(
       downscale_which_refmap = "refmap_climr",
       downscale_obs_periods = "2001_2020",
       downscale_obs_years = c(),
@@ -307,7 +305,26 @@ shiny::shinyApp(
       downscale_max_run = 0,
       downscale_run_nm = c(),
       downscale_core_vars = sort(sprintf(c("PPT_%02d", "Tmax_%02d", "Tmin_%02d"), sort(rep(1:12, 3)))),
-      downscale_core_ppt_lr = FALSE,
+      downscale_core_ppt_lr = FALSE
+    )
+
+    vstore <- reactiveValues(
+      temporality = "Annual",
+      tifsource = names(climr_tif) |> head(1),
+      climatevar = "NONE",
+      downscale_which_refmap = downscale_default[["downscale_which_refmap"]],
+      downscale_obs_periods = downscale_default[["downscale_obs_periods"]],
+      downscale_obs_years = downscale_default[["downscale_obs_years"]],
+      downscale_obs_ts_dataset = downscale_default[["downscale_obs_ts_dataset"]],
+      downscale_gcms = downscale_default[["downscale_gcms"]],
+      downscale_ssps = downscale_default[["downscale_ssps"]],
+      downscale_gcm_periods = downscale_default[["downscale_gcm_periods"]],
+      downscale_gcm_ssp_years = downscale_default[["downscale_gcm_ssp_years"]],
+      downscale_gcm_hist_years = downscale_default[["downscale_gcm_hist_years"]],
+      downscale_max_run = downscale_default[["downscale_max_run"]],
+      downscale_run_nm = downscale_default[["downscale_run_nm"]],
+      downscale_core_vars = downscale_default[["downscale_core_vars"]],
+      downscale_core_ppt_lr = downscale_default[["downscale_core_ppt_lr"]],
       downscale_output = "csv",
       downscale_resolution = 2500,
       vscale = ""
@@ -328,7 +345,7 @@ shiny::shinyApp(
     shiny::observeEvent(input$downscale_process_launch, sg$process())
 
     # ---- Downscale events
-    shiny::observeEvent(input$downscale_parameters, {
+    downscale_modal <- function() {
       shiny::showModal(
         shiny::modalDialog(
           title = "Downscale Parameters", size = "xl", easyClose = TRUE, fade = FALSE, class = "modal-dialog-scrollable",
@@ -354,7 +371,7 @@ shiny::shinyApp(
             width = "100%",
             choices = climr::list_obs_years(),
             multiple = TRUE,
-            selected = c()
+            selected = vstore[["downscale_obs_years"]]
           ),
           shiny::selectInput(
             inputId = "downscale_obs_ts_dataset",
@@ -415,7 +432,17 @@ shiny::shinyApp(
             inputId = "downscale_run_nm",
             label = "Name of specified runs",
             width = "100%",
-            choices = c(),
+            choices = {
+              gcms <- vstore[["downscale_gcms"]]
+              ssps <- vstore[["downscale_ssps"]]
+              if (!length(gcms) && !length(ssps)) {
+                c()
+              } else if (length(gcms) && !length(ssps)) {
+                climr::list_runs_historic(gcm = gcms)
+              } else if (length(gcms) && length(ssps)) {
+                climr::list_runs_ssp(gcm = gcms, ssp = ssps)
+              }
+            },
             multiple = TRUE,
             selected = vstore[["downscale_run_nm"]]
           ),
@@ -429,33 +456,148 @@ shiny::shinyApp(
           ),
           shiny::checkboxInput(
             inputId = "downscale_core_ppt_lr",
-            label = "Precipitaion elevation adjustment"
+            label = "Precipitaion elevation adjustment",
+            value = vstore[["downscale_core_ppt_lr"]]
           ),
+          footer = shiny::tagList(
+            shiny::actionButton(
+              inputId = "downscale_reset",
+              label = "Reset",
+              class = "btn btn-warning"
+            ),
+            shiny::modalButton("Dismiss") # Default dismiss button
+          )
+        )
+      )
+    }
+
+    shiny::observeEvent(input$downscale_parameters, {
+      downscale_modal()
+    })
+
+    # Generic function to handle vstore updates and notifications
+    update_vstore_and_notify <- function(vstore_key, input_value, msg_format) {
+
+      vpl <- 30  # Short variable name for value print limit
+
+      # Capture current value in vstore (NULL if not set)
+      current_value <- vstore[[vstore_key]]
+
+      if (is.null(input_value)) {
+        input_value <- c()
+        if (vstore_key == "downscale_core_vars") return()
+      }
+      
+      # Calculate additions and deletions
+      additions <- setdiff(input_value, current_value)
+      deletions <- setdiff(current_value, input_value)
+      
+      # Update vstore with the new input value
+      vstore[[vstore_key]] <- input_value
+      
+      # Determine the message based on additions or deletions
+      if (length(additions) > 0) {
+        diff_value <- substr(paste(additions, collapse = ", "), 1, vpl)
+        shiny::showNotification(
+          sprintf("%s added [%s]", msg_format, diff_value),
+          duration = 2
+        )
+      } else if (length(deletions) > 0) {
+        diff_value <- substr(paste(deletions, collapse = ", "), 1, vpl)
+        shiny::showNotification(
+          sprintf("%s removed [%s]", msg_format, diff_value),
+          duration = 2
+        )
+      }
+    }
+
+    # Observe events using the generic function
+    shiny::observeEvent(input$downscale_which_refmap, {
+      update_vstore_and_notify("downscale_which_refmap", input$downscale_which_refmap, "Ref map")
+    })
+    
+    shiny::observeEvent(input$downscale_obs_periods, {
+      update_vstore_and_notify("downscale_obs_periods", input$downscale_obs_periods, "Obs periods")
+    })
+    
+    shiny::observeEvent(input$downscale_obs_years, {
+      update_vstore_and_notify("downscale_obs_years", input$downscale_obs_years, "Obs years")
+    }, ignoreNULL = FALSE)
+    
+    shiny::observeEvent(input$downscale_obs_ts_dataset, {
+      update_vstore_and_notify("downscale_obs_ts_dataset", input$downscale_obs_ts_dataset, "Obs dataset")
+    })
+    
+    shiny::observeEvent(input$downscale_gcms, {
+      update_vstore_and_notify("downscale_gcms", input$downscale_gcms, "GCMs")
+    }, ignoreNULL = FALSE)
+    
+    shiny::observeEvent(input$downscale_ssps, {
+      update_vstore_and_notify("downscale_ssps", input$downscale_ssps, "SSPs")
+    }, ignoreNULL = FALSE)
+    
+    shiny::observeEvent(input$downscale_gcm_periods, {
+      update_vstore_and_notify("downscale_gcm_periods", input$downscale_gcm_periods, "GCM periods")
+    }, ignoreNULL = FALSE)
+    
+    shiny::observeEvent(input$downscale_gcm_ssp_years, {
+      update_vstore_and_notify("downscale_gcm_ssp_years", input$downscale_gcm_ssp_years, "GCM SSP years")
+    }, ignoreNULL = FALSE)
+    
+    shiny::observeEvent(input$downscale_gcm_hist_years, {
+      update_vstore_and_notify("downscale_gcm_hist_years", input$downscale_gcm_hist_years, "GCM hist years")
+    }, ignoreNULL = FALSE)
+    
+    shiny::observeEvent(input$downscale_max_run, {
+      update_vstore_and_notify("downscale_max_run", input$downscale_max_run, "Max run")
+    })
+    
+    shiny::observeEvent(input$downscale_run_nm, {
+      update_vstore_and_notify("downscale_run_nm", input$downscale_run_nm, "Run name")
+    }, ignoreNULL = FALSE)
+    
+    shiny::observeEvent(input$downscale_core_vars, {
+      update_vstore_and_notify("downscale_core_vars", input$downscale_core_vars, "Core vars")
+    }, ignoreNULL = FALSE)
+    
+    shiny::observeEvent(input$downscale_core_ppt_lr, {
+      update_vstore_and_notify("downscale_core_ppt_lr", input$downscale_core_ppt_lr, "Core PPT LR")
+    })
+
+    shiny::observeEvent(input$downscale_reset, {
+      shiny::showModal(
+        shiny::modalDialog(
+          title = "Confirm Reset",
+          "Are you sure you want to reset the downscale preferences to default values?",
+          footer = tagList(
+            shiny::actionButton("confirm_reset_yes", "Yes", class = "btn btn-danger"),
+            shiny::actionButton("confirm_reset_no", "No")
+          ),
+          easyClose = TRUE
         )
       )
     })
-    shiny::observeEvent(input$downscale_which_refmap, {vstore[["downscale_which_refmap"]] <- input$downscale_which_refmap})
-    shiny::observeEvent(input$downscale_obs_periods, {vstore[["downscale_obs_periods"]] <- input$downscale_obs_periods})
-    shiny::observeEvent(input$downscale_obs_years, {vstore[["downscale_obs_years"]] <- input$downscale_obs_years})
-    shiny::observeEvent(input$downscale_obs_ts_dataset, {vstore[["downscale_obs_ts_dataset"]] <- input$downscale_obs_ts_dataset})
-    shiny::observeEvent(input$downscale_gcms, {vstore[["downscale_gcms"]] <- input$downscale_gcms})
-    shiny::observeEvent(input$downscale_ssps, {vstore[["downscale_ssps"]] <- input$downscale_ssps})
-    shiny::observeEvent(input$downscale_gcm_periods, {vstore[["downscale_gcm_periods"]] <- input$downscale_gcm_periods})
-    shiny::observeEvent(input$downscale_gcm_ssp_years, {vstore[["downscale_gcm_ssp_years"]] <- input$downscale_gcm_ssp_years})
-    shiny::observeEvent(input$downscale_gcm_hist_years, {vstore[["downscale_gcm_hist_years"]] <- input$downscale_gcm_hist_years})
-    shiny::observeEvent(input$downscale_max_run, {vstore[["downscale_max_run"]] <- input$downscale_max_run})
-    shiny::observeEvent(input$downscale_run_nm, {vstore[["downscale_run_nm"]] <- input$downscale_run_nm})
-    shiny::observeEvent(input$downscale_core_vars, {vstore[["downscale_core_vars"]] <- input$downscale_core_vars})
-    shiny::observeEvent(input$downscale_core_ppt_lr, {vstore[["downscale_core_ppt_lr"]] <- input$downscale_core_ppt_lr})
-    shiny::observe({
+    
+    shiny::observeEvent(input$confirm_reset_yes, {
+      lapply(names(downscale_default), \(x) {
+        vstore[[x]] <- downscale_default[[x]]
+      })
+      downscale_modal()
+    })
+
+    shiny::observeEvent(input$confirm_reset_no, {
+      downscale_modal()
+    })
+
+    shiny::observeEvent(c(vstore[["downscale_gcms"]],vstore[["downscale_ssps"]]), {
       gcms <- vstore[["downscale_gcms"]]
       ssps <- vstore[["downscale_ssps"]]
       if (!length(gcms) && !length(ssps)) {
-        shiny::updateSelectInput(inputId = "downscale_run_nm", choices = c())
+        shiny::updateSelectInput(inputId = "downscale_run_nm", choices = c(), selected = vstore[["downscale_run_nm"]])
       } else if (length(gcms) && !length(ssps)) {
-        shiny::updateSelectInput(inputId = "downscale_run_nm", choices = climr::list_runs_historic(gcm = gcms))
+        shiny::updateSelectInput(inputId = "downscale_run_nm", choices = climr::list_runs_historic(gcm = gcms), selected = vstore[["downscale_run_nm"]])
       } else if (length(gcms) && length(ssps)) {
-        shiny::updateSelectInput(inputId = "downscale_run_nm", choices = climr::list_runs_ssp(gcm = gcms, ssp = ssps))
+        shiny::updateSelectInput(inputId = "downscale_run_nm", choices = climr::list_runs_ssp(gcm = gcms, ssp = ssps), selected = vstore[["downscale_run_nm"]])
       }
     })
     shiny::observeEvent(input$downscale_process, {
@@ -478,7 +620,7 @@ shiny::shinyApp(
       })
       shiny::showModal(
         shiny::modalDialog(
-          title = "Preferences for Downscale Processing", size = "l", easyClose = TRUE, fade = FALSE,
+          title = "Preferences for Downscale Processing", size = "l", easyClose = TRUE, fade = FALSE, 
           shiny::div(
             title = "csv: all points are returned in csv. tif: Only shapes/rasters are returned as GeoTIFF if selected.",
             shiny::radioButtons(
@@ -510,7 +652,7 @@ shiny::shinyApp(
             class = "btn btn-primary btn-lg",
             icon = shiny::icon("play"),
             width = "100%"
-          ),
+          )
         )
       )
     })
