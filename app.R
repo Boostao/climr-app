@@ -99,26 +99,6 @@ l <- leaflet::leaflet(
   leaflet::hideGroup(c("WNA BEC", "Climate")) |>
   leaflet::showGroup("Hillshade")
 
-time_labels <- c(
-  "Annual" = "",
-  "Winter" = "wt",
-  "Spring" = "sp",
-  "Summer" = "sm",
-  "Autumn" = "at",
-  "January" = "01",
-  "February" = "02",
-  "March" = "03",
-  "April" = "04",
-  "May" = "05",
-  "June" = "06",
-  "July" = "07",
-  "August" = "08",
-  "September" = "09",
-  "October" = "10",
-  "November" = "11",
-  "December" = "12"
-)
-
 # Shiny App ----
 shiny::shinyApp(
   ui = shiny::tagList(
@@ -339,6 +319,8 @@ shiny::shinyApp(
 
     vstore <- reactiveValues(
       tifsource = names(climr_tif) |> head(1),
+      time = NULL,
+      element = NULL,
       climatevar = "NONE",
       downscale_which_refmap = downscale_default[["downscale_which_refmap"]],
       downscale_obs_periods = downscale_default[["downscale_obs_periods"]],
@@ -355,7 +337,7 @@ shiny::shinyApp(
       downscale_core_ppt_lr = downscale_default[["downscale_core_ppt_lr"]],
       downscale_output = "csv",
       downscale_resolution = 2500,
-      vscale = ""
+      vscale = "none"
     )
 
     # ---- Geometry
@@ -547,8 +529,8 @@ shiny::shinyApp(
               inputId = "downscale_reset",
               label = "Reset",
               class = "btn btn-warning"
-            ),
-            shiny::modalButton("Dismiss")
+            ),           
+            shiny::modalButton("Close")
           )
         )
       )
@@ -722,6 +704,7 @@ shiny::shinyApp(
 
     # ---- Overlay events
     shiny::observeEvent(input$select_overlay, {
+      output$vscale_overlay <- NULL
       shiny::showModal(
         shiny::modalDialog(
           title = "Climate Overlay Selection",
@@ -739,14 +722,39 @@ shiny::shinyApp(
             inputId = "element",
             label = "Climate Element",
             width = "100%",
-            choices = NULL
+            choices = {
+              dt <- climr_tif[[vstore[["tifsource"]]]]
+              elements <- unique(dt[, list(element, category, label)])
+              basic <- elements[category %in% "Basic elements", setNames(element, label)]
+              derived <- elements[category %in% "Derived elements", setNames(element, label)]
+              annual <- elements[category %in% "Annual elements" & !(element %in% derived), setNames(element, label)]
+              list(
+                "Basic elements" = basic,
+                "Derived elements" = derived,
+                "Annual elements" = annual
+              )
+            },
+            selected = vstore[["element"]]
           ),
           shiny::selectInput(
             inputId = "time",
             label = "Time Period",
             width = "100%",
-            choices = NULL
+            choices = {
+              dt <- climr_tif[[vstore[["tifsource"]]]]
+              available_times <- dt[element %in% input$element, unique(time_code)]
+              annual <- setNames("aa"["aa" %in% available_times], "Annual"["aa" %in% available_times])
+              season <- time_labels_season[time_labels_season %in% available_times]
+              month <- time_labels_month[time_labels_month %in% available_times]
+              list(
+                "Default" = annual,
+                "Seasons" = season,
+                "Months" = month
+              )
+            },
+            selected = vstore[["time"]]
           ),
+          shiny::uiOutput("vscale_overlay"),
           footer = shiny::tagList(
             shiny::actionButton(
               inputId = "load_overlay",
@@ -754,38 +762,46 @@ shiny::shinyApp(
               icon = shiny::icon("droplet"),
               class = "btn btn-primary"
             ),
-            shiny::modalButton("Dismiss")
+            shiny::modalButton("Close")
           )
         )
       )
     })
 
     shiny::observeEvent(input$tifsource, {
-      vstore[["tifsource"]] <- input$tifsource
-      dt <- climr_tif[[input$tifsource]]
-      elements <- unique(dt[, list(element, category)])
-      basic <- elements[category == "Basic elements", element]
-      derived <- elements[category == "Derived elements", element]
-      annual <- elements[category == "Annual elements", element]
+      vstore[["tifsource"]] <<- input$tifsource
+      dt <- climr_tif[[vstore[["tifsource"]]]]
+      elements <- unique(dt[, list(element, category, label)])
+      basic <- elements[category %in% "Basic elements", setNames(element, label)]
+      derived <- elements[category %in% "Derived elements", setNames(element, label)]
+      annual <- elements[category %in% "Annual elements" & !(element %in% derived), setNames(element, label)]
       choices <- list(
-        "Basic elements" = setNames(basic, basic),
-        "Derived elements" = setNames(derived, derived),
-        "Annual elements" = setNames(annual, annual)
+        "Basic elements" = basic,
+        "Derived elements" = derived,
+        "Annual elements" = annual
       )
-      shiny::updateSelectInput(session, "element", choices = choices, selected = basic[1])
+      shiny::updateSelectInput(inputId = "element", choices = choices)
     })
 
     shiny::observeEvent(input$element, {
-      dt <- climr_tif[[input$tifsource]]
-      available_times <- dt[element == input$element, unique(time_code)]
-      time_choices <- time_labels[time_labels %in% available_times]
-      selected_time <- if ("" %in% available_times) "Annual" else time_choices[1]
-      shiny::updateSelectInput(session, "time", choices = time_choices, selected = selected_time)
+      vstore[["element"]] <<- input$element
+      dt <- climr_tif[[vstore[["tifsource"]]]]
+      available_times <- dt[element %in% input$element, unique(time_code)]
+      annual <- setNames("aa"["aa" %in% available_times], "Annual"["aa" %in% available_times])
+      season <- time_labels_season[time_labels_season %in% available_times]
+      month <- time_labels_month[time_labels_month %in% available_times]
+      choices <- list(
+        "Default" = annual,
+        "Seasons" = season,
+        "Months" = month
+      )
+      shiny::updateSelectInput(inputId = "time", choices = choices)
     })
 
     shiny::observeEvent(input$time, {
+      vstore[["time"]] <<- input$time
       if (is.null(input$element) || is.null(input$time)) return()
-      dt <- climr_tif[[input$tifsource]]
+      dt <- climr_tif[[vstore[["tifsource"]]]]
       url <- dt[element == input$element & time_code == input$time, url]
       if (length(url) == 1) {
         vstore[["climatevar"]] <- url
@@ -795,44 +811,68 @@ shiny::shinyApp(
     })
 
     shiny::observeEvent(input$load_overlay, {
-      mp <- leaflet::leafletProxy("climr")
+      mp <- leaflet::leafletProxy("climr", deferUntilFlush = FALSE)
       mp |> leaflet::clearGroup("Climate") |> leaflet::hideGroup("Climate")
       session$sendCustomMessage(type="jsCode", list(code= "$('#rasterValues-val').remove();"))
       shiny::updateActionButton(inputId = "download_overlay", disabled = TRUE)
       if ("NONE" %in% vstore[["climatevar"]] | 0 == input$opacity) return()
       shiny::updateActionButton(inputId = "download_overlay", disabled = FALSE)
       prefix <- vstore[["climatevar"]] |> basename() |> tools::file_path_sans_ext()
+      if (prefix %in% climr_ratios) {
+        vstore[["vscale"]] <- "log2"
+      } else {
+        vstore[["vscale"]] <- ""
+      }
       fpal <- if (isTRUE(input$inverse)) rev else identity
+      pal <- pals$colors[[input$palette]] |> fpal()
       mp |> leafem::addGeotiff(
         url = vstore[["climatevar"]],
         group = "Climate",
         layerId = "val",
         project = FALSE,
         opacity = input$opacity / 100,
+        resolution = input$resolution,
         colorOptions = leafem::colorOptions(
-          palette = pals$colors[[input$palette]] |> fpal(),
+          palette = pal,
           na.color = "transparent"
         ),
+        ## pixelValuesToColorFn evaluation scope is preventing us from
+        ## accessing values needed to redefine pixelValuesToColorFn function
+        ## using georaster min/max. Since we are feeding a URL, these
+        ## values are not accessible from R
+        ## Sending a custom message to redraw the layer has delay issue
+        ## since the custom message is processed before Leaflet has
+        ## finished drawing the geotiff layer.
+        ## So we fall back to uiOutput hacky way.
+        # pixelValuesToColorFn = "scoping issue"
         imagequery = TRUE,
         imagequeryOptions = leafem::imagequeryOptions(
           prefix = prefix
         ),
         autozoom = FALSE,
         options = leaflet::tileOptions(maxZoom = 25, maxNativeZoom = 20)
-      )
-      if (prefix %in% climr_ratios) {
-        vstore[["vscale"]] <- "log2"
-      } else {
-        vstore[["vscale"]] <- ""
-      }
-      session$sendCustomMessage(type="updateClimatePalette", list(
-        category = "image", layerId = "val", vscale = vstore[["vscale"]], colorOptions = leafem::colorOptions(
-          palette = pals$colors[[input$palette]] |> fpal(),
-          na.color = "transparent"
+      ) |> leaflet::showGroup("Climate")
+      
+      output$vscale_overlay <- shiny::renderUI({
+        shiny::selectInput(
+          inputId = "vscale",
+          label = "Scale Adjustement",
+          width = "100%",
+          choices = {
+            if (prefix %in% climr_ratios) {
+              c("None" = "none", "Log" = "log2")
+            } else {
+              c("None" = "none")
+            }
+          }
         )
-      ))
-      mp |> leaflet::showGroup("Climate")
+      })
+
       shiny::showNotification("Rendering %s values" |> sprintf(prefix), duration = 5)
+    })
+
+    shiny::observeEvent(input$vscale, {
+      vstore[["vscale"]] <- input$vscale
     })
 
     shiny::observeEvent(input$opacity, {

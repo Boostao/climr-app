@@ -92,17 +92,23 @@ labelf <- function(fcontent) {
   annual_idx <- setdiff(seq_along(lbl), c(season_idx, monthly_idx))
   resp <- data.table::data.table(
     name = c(
-      fcontent$name[annual_idx],
+      fcontent$name[monthly_idx],
       fcontent$name[season_idx],
-      fcontent$name[monthly_idx]
+      fcontent$name[annual_idx]
     ),
     url = c(
-      fcontent$url[annual_idx],
+      fcontent$url[monthly_idx],
       fcontent$url[season_idx],
-      fcontent$url[monthly_idx]
+      fcontent$url[annual_idx]
     ),
     label = c(
-      climatevars[lbl[annual_idx]],
+      {
+        s1 <- strsplit(
+          lbl[monthly_idx],
+          paste0("_?", names(months), "$", collapse = "|")
+        ) |> unlist()
+        climatevars[s1]
+      },
       {
         s1 <- strsplit(
           lbl[season_idx],
@@ -110,32 +116,55 @@ labelf <- function(fcontent) {
         ) |> unlist()
         climatevars[s1]
       },
-      {
-        s1 <- strsplit(
-          lbl[monthly_idx],
-          paste0("_?", names(months), "$", collapse = "|")
-        ) |> unlist()
-        climatevars[s1]
-      }
+      climatevars[lbl[annual_idx]]
     ),
     element = c(
-      lbl[annual_idx],
-      substr(lbl[season_idx], 1, nchar(lbl[season_idx])-3),
-      substr(lbl[monthly_idx], 1, nchar(lbl[monthly_idx])-3)
+      strsplit(
+        lbl[monthly_idx],
+        paste0("_?", names(months), "$", collapse = "|")
+      ) |> unlist(),
+      strsplit(
+        lbl[season_idx],
+        paste0("_", names(seasons), "$", collapse = "|")
+      ) |> unlist(),
+      lbl[annual_idx]
     ),
     time_code = c(
-      rep("", length(annual_idx)),
+      substr(lbl[monthly_idx], nchar(lbl[monthly_idx]) - 1, nchar(lbl[monthly_idx])),
       substr(lbl[season_idx], nchar(lbl[season_idx]) - 1, nchar(lbl[season_idx])),
-      substr(lbl[monthly_idx], nchar(lbl[monthly_idx]) - 1, nchar(lbl[monthly_idx]))
+      rep("aa", length(annual_idx))
     ),
     category = c(
-      c("Annual elements","Basic elements")[grepl("^PPT|^Tmin|^Tmax", lbl[annual_idx])+1],
+      c("Derived elements","Basic elements")[grepl("^PPT|^Tmin|^Tmax", lbl[monthly_idx])+1],
       c("Derived elements","Basic elements")[grepl("^PPT|^Tmin|^Tmax", lbl[season_idx])+1],
-      c("Derived elements","Basic elements")[grepl("^PPT|^Tmin|^Tmax", lbl[monthly_idx])+1]
+      c("Annual elements","Basic elements")[grepl("^PPT|^Tmin|^Tmax", lbl[annual_idx])+1]
     )
   )
+  data.table::set(resp, j = "label", value = resp[, "(%s) %s" |> sprintf(element, label)])
   return(resp)
 }
+
+time_labels_season <- c(
+  "Annual" = "",
+  "Winter" = "wt",
+  "Spring" = "sp",
+  "Summer" = "sm",
+  "Autumn" = "at"
+)
+time_labels_month <- c(
+  "January" = "01",
+  "February" = "02",
+  "March" = "03",
+  "April" = "04",
+  "May" = "05",
+  "June" = "06",
+  "July" = "07",
+  "August" = "08",
+  "September" = "09",
+  "October" = "10",
+  "November" = "11",
+  "December" = "12"
+)
 
 # Tiles source
 climr_tif <- url_process(Sys.getenv("CLIMR_TIF_URL"))
@@ -228,8 +257,6 @@ add_custom_render <- function(map) {
         }
       }
 
-      
-
       var updateClimatePalette=function(message) {
         var prefixedLayerId = map.layerManager._layerIdKey(message.category, message.layerId);
         var layer = map.layerManager._byLayerId[prefixedLayerId];
@@ -243,15 +270,13 @@ add_custom_render <- function(map) {
             let domain = [scaleFunc(georaster.mins[0]), scaleFunc(georaster.maxs[0])];
             let nacol = colorOptions["na.color"];
             let clr = scale.domain(domain);
-            console.log(message.vscale);
             pixelValuesToColorFn = values => {
                 let vals = values[0];
                 if (isNaN(vals) || vals === georaster.noDataValue) return nacol;
                 let processedVals = scaleFunc(vals);
                 return clr(processedVals).hex();
             };
-            layer.options.pixelValuesToColorFn = pixelValuesToColorFn;
-            layer.redraw();
+            layer.updateColors(pixelValuesToColorFn);
         }
       }
 
