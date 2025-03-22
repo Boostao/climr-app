@@ -108,28 +108,30 @@ labelf <- function(fcontent) {
           lbl[season_idx],
           paste0("_", names(seasons), "$", collapse = "|")
         ) |> unlist()
-        s2 <- strsplit(
-          lbl[season_idx],
-          paste0("^", unique(s1), "_", collapse = "|")
-        ) |> lapply(tail, 1) |> unlist()
-        paste(climatevars[s1], seasons[s2], sep = " - ")
+        climatevars[s1]
       },
       {
         s1 <- strsplit(
           lbl[monthly_idx],
           paste0("_?", names(months), "$", collapse = "|")
         ) |> unlist()
-        s2 <- strsplit(
-          lbl[monthly_idx],
-          paste0("^", unique(s1), "_?", collapse = "|")
-        ) |> lapply(tail, 1) |> unlist()
-        paste(climatevars[s1], months[s2], sep = " - ")
+        climatevars[s1]
       }
     ),
-    temporality = c(
-      rep("Annual", length(annual_idx)),
-      rep("Seasonal", length(season_idx)),
-      rep("Monthly", length(monthly_idx))
+    element = c(
+      lbl[annual_idx],
+      substr(lbl[season_idx], 1, nchar(lbl[season_idx])-3),
+      substr(lbl[monthly_idx], 1, nchar(lbl[monthly_idx])-3)
+    ),
+    time_code = c(
+      rep("", length(annual_idx)),
+      substr(lbl[season_idx], nchar(lbl[season_idx]) - 1, nchar(lbl[season_idx])),
+      substr(lbl[monthly_idx], nchar(lbl[monthly_idx]) - 1, nchar(lbl[monthly_idx]))
+    ),
+    category = c(
+      c("Annual elements","Basic elements")[grepl("^PPT|^Tmin|^Tmax", lbl[annual_idx])+1],
+      c("Derived elements","Basic elements")[grepl("^PPT|^Tmin|^Tmax", lbl[season_idx])+1],
+      c("Derived elements","Basic elements")[grepl("^PPT|^Tmin|^Tmax", lbl[monthly_idx])+1]
     )
   )
   return(resp)

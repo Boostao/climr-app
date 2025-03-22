@@ -40,7 +40,6 @@ if (!length(felev <- which(file.exists(elevtif)))) {
   cec <- terra::rast(elevtif[felev])
 }
 
-
 # Base map ----
 l <- leaflet::leaflet(
     options = leaflet::leafletOptions(maxZoom = 25)
@@ -70,8 +69,7 @@ l <- leaflet::leaflet(
     urlTemplate = paste0("https://api.mapbox.com/styles/v1/", mbhsstyle, "/tiles/{z}/{x}/{y}?access_token=", mbtk),
     attribution = '&#169; <a href="https://www.mapbox.com/feedback/">Mapbox</a>',
     options = leaflet::pathOptions(pane = "mapPane", maxZoom = 25, maxNativeZoom = 22),
-    group = "Hillshade",
-
+    group = "Hillshade"
   ) |>
   # overlay layer
   leaflet::addTiles(
@@ -101,12 +99,28 @@ l <- leaflet::leaflet(
   leaflet::hideGroup(c("WNA BEC", "Climate")) |>
   leaflet::showGroup("Hillshade")
 
+time_labels <- c(
+  "Annual" = "",
+  "Winter" = "wt",
+  "Spring" = "sp",
+  "Summer" = "sm",
+  "Autumn" = "at",
+  "January" = "01",
+  "February" = "02",
+  "March" = "03",
+  "April" = "04",
+  "May" = "05",
+  "June" = "06",
+  "July" = "07",
+  "August" = "08",
+  "September" = "09",
+  "October" = "10",
+  "November" = "11",
+  "December" = "12"
+)
+
 # Shiny App ----
-
 shiny::shinyApp(
-
-# Shiny UI ----
-    
   ui = shiny::tagList(
     # Favicon
     tags$head(
@@ -116,12 +130,13 @@ shiny::shinyApp(
       tags$link(rel="mask-icon", href="images/bcid-apple-icon.svg", color="#036"),
       tags$link(rel="icon", href="images/bcid-favicon-32x32.png")
     ),
-    shiny::navbarPage(collapsible = TRUE, 
+    shiny::navbarPage(
+      collapsible = TRUE,
       theme = bslib::bs_theme(
         preset = "bcgov",
         "navbar-brand-padding-y" = "0rem",
         "navbar-brand-margin-end" = "4rem"
-      ), 
+      ),
       title = shiny::tagList(
         shiny::tags$image(
           src = "images/bcid-logo-rev-en.svg",
@@ -131,13 +146,16 @@ shiny::shinyApp(
         ),
         "ClimR"
       ),
-      shiny::tabPanel(title = "Map",
-        shiny::div(class="outer",
+      shiny::tabPanel(
+        title = "Map",
+        shiny::div(
+          class = "outer",
           leaflet::leafletOutput("climr", width = "100%", height = "100%"),
           shiny::absolutePanel(
             class = "input-control",
             shiny::div(class = "input-control-header", shiny::h4("Controls")),
-            shiny::div(class = "input-control-body",
+            shiny::div(
+              class = "input-control-body",
               shiny::div(
                 title = "Upload a csv, a raster or a shape file to add geographies",
                 shiny::fileInput(
@@ -153,12 +171,16 @@ shiny::shinyApp(
                 class = "btn btn-primary btn-sm",
                 icon = shiny::icon("gear"),
                 width = "62%"
-              ),  
+              ),
               shiny::actionButton(
                 inputId = "downscale_process",
                 label = "",
                 title = "Open downscale process launch window with currently active geographies",
-                class = "btn btn-secondary btn-sm", icon = shiny::icon("play"), width = "17%", disabled = TRUE),
+                class = "btn btn-secondary btn-sm",
+                icon = shiny::icon("play"),
+                width = "17%",
+                disabled = TRUE
+              ),
               shiny::downloadButton(
                 outputId = "downscale_download",
                 label = "",
@@ -168,7 +190,7 @@ shiny::shinyApp(
               # Overlay parameters
               shiny::hr(),
               shiny::actionButton(
-                inputId = "selectoverlay",
+                inputId = "select_overlay",
                 label = "Select Overlay",
                 title = "Open map climate overlay selection",
                 class = "btn btn-primary btn-sm",
@@ -176,7 +198,7 @@ shiny::shinyApp(
                 width = "62%"
               ),
               shiny::actionButton(
-                inputId = "downloadoverlay",
+                inputId = "download_overlay",
                 label = "Download",
                 title = "Download currently active overlay raster (tif)",
                 class = "btn btn-secondary btn-sm",
@@ -195,7 +217,7 @@ shiny::shinyApp(
                   step = 1,
                   post = "%",
                   ticks = FALSE
-                ),
+                )
               ),
               shiny::tags$div(
                 title = "Adjust the resolution of the currently active overlay",
@@ -228,15 +250,17 @@ shiny::shinyApp(
                   shiny::checkboxInput("inverse", "Invert", width = "72px")
                 )
               )
-            )           
+            )
           )
         )
       ),
       shiny::navbarMenu(
         "Data",
         "Locations",
-        shiny::tabPanel(title = "Geometry",
-          shiny::div(class="outer2",
+        shiny::tabPanel(
+          title = "Geometry",
+          shiny::div(
+            class = "outer2",
             DT::DTOutput(outputId = "geom_dt")
           )
         )
@@ -270,40 +294,28 @@ shiny::shinyApp(
       )
     ),
     # Footer
-    tags$footer(class = "footer mt-5",
-      tags$nav(class = "navbar navbar-expand-lg bottom-static navbar-dark bg-primary-nav",
-        tags$div(class = "container",
-          tags$ul(class = "navbar-nav",
-            tags$li(class = "nav-item",
-              tags$a(class = "nav-link", href = "https://www2.gov.bc.ca/gov/content/home", "Home", target = "_blank")
-            ),
-            tags$li(class = "nav-item",
-              tags$a(class = "nav-link", href = "https://www2.gov.bc.ca/gov/content?id=79F93E018712422FBC8E674A67A70535", "Disclaimer", target = "_blank")
-            ),
-            tags$li(class = "nav-item",
-              tags$a(class = "nav-link", href = "https://www2.gov.bc.ca/gov/content?id=9E890E16955E4FF4BF3B0E07B4722932", "Privacy", target = "_blank")
-            ),
-            tags$li(class = "nav-item",
-              tags$a(class = "nav-link", href = "https://www2.gov.bc.ca/gov/content?id=E08E79740F9C41B9B0C484685CC5E412", "Accessibility", target = "_blank")
-            ),
-            tags$li(class = "nav-item",
-              tags$a(class = "nav-link", href = "https://www2.gov.bc.ca/gov/content?id=1AAACC9C65754E4D89A118B875E0FBDA", "Copyright", target = "_blank")
-            ),
-            tags$li(class = "nav-item",
-              tags$a(class = "nav-link", href = "https://www2.gov.bc.ca/gov/content?id=6A77C17D0CCB48F897F8598CCC019111", "Contact Us", target = "_blank")
-            ),
+    tags$footer(
+      class = "footer mt-5",
+      tags$nav(
+        class = "navbar navbar-expand-lg bottom-static navbar-dark bg-primary-nav",
+        tags$div(
+          class = "container",
+          tags$ul(
+            class = "navbar-nav",
+            tags$li(class = "nav-item", tags$a(class = "nav-link", href = "https://www2.gov.bc.ca/gov/content/home", "Home", target = "_blank")),
+            tags$li(class = "nav-item", tags$a(class = "nav-link", href = "https://www2.gov.bc.ca/gov/content?id=79F93E018712422FBC8E674A67A70535", "Disclaimer", target = "_blank")),
+            tags$li(class = "nav-item", tags$a(class = "nav-link", href = "https://www2.gov.bc.ca/gov/content?id=9E890E16955E4FF4BF3B0E07B4722932", "Privacy", target = "_blank")),
+            tags$li(class = "nav-item", tags$a(class = "nav-link", href = "https://www2.gov.bc.ca/gov/content?id=E08E79740F9C41B9B0C484685CC5E412", "Accessibility", target = "_blank")),
+            tags$li(class = "nav-item", tags$a(class = "nav-link", href = "https://www2.gov.bc.ca/gov/content?id=1AAACC9C65754E4D89A118B875E0FBDA", "Copyright", target = "_blank")),
+            tags$li(class = "nav-item", tags$a(class = "nav-link", href = "https://www2.gov.bc.ca/gov/content?id=6A77C17D0CCB48F897F8598CCC019111", "Contact Us", target = "_blank"))
           )
         )
       )
     )
-  )
+  ),
 
-  ,
-
-# Shiny server ----
-
+  # Shiny server ----
   server = function(input, output, session) {
-    
     session$allowReconnect("force")
 
     # ---- Modal input storage
@@ -326,7 +338,6 @@ shiny::shinyApp(
     )
 
     vstore <- reactiveValues(
-      temporality = "Annual",
       tifsource = names(climr_tif) |> head(1),
       climatevar = "NONE",
       downscale_which_refmap = downscale_default[["downscale_which_refmap"]],
@@ -346,19 +357,19 @@ shiny::shinyApp(
       downscale_resolution = 2500,
       vscale = ""
     )
-    
+
     # ---- Geometry
     source("scripts/geometry.R", local = TRUE)
     sg <- session_geometry()
 
     # ---- Map events
-    shiny::observeEvent(input$climr_draw_start,         sg$add_point_enabled(FALSE))
-    shiny::observeEvent(input$climr_draw_stop,          sg$add_point_enabled(TRUE))
-    shiny::observeEvent(input$climr_draw_new_feature,   sg$add_draw_poly(input$climr_draw_new_feature))
-    shiny::observeEvent(input$climr_click,              sg$add_point(input$climr_click$lat, input$climr_click$lng))
-    shiny::observeEvent(input$upload,                   sg$add_file(input$upload))
-    shiny::observeEvent(input$sg_remove,                sg$rm(input$sg_remove))
-    shiny::observeEvent(input$sg_view,                  sg$view(input$sg_view))
+    shiny::observeEvent(input$climr_draw_start, sg$add_point_enabled(FALSE))
+    shiny::observeEvent(input$climr_draw_stop, sg$add_point_enabled(TRUE))
+    shiny::observeEvent(input$climr_draw_new_feature, sg$add_draw_poly(input$climr_draw_new_feature))
+    shiny::observeEvent(input$climr_click, sg$add_point(input$climr_click$lat, input$climr_click$lng))
+    shiny::observeEvent(input$upload, sg$add_file(input$upload))
+    shiny::observeEvent(input$sg_remove, sg$rm(input$sg_remove))
+    shiny::observeEvent(input$sg_view, sg$view(input$sg_view))
     shiny::observeEvent(input$downscale_process_launch, {
       shiny::showModal(
         shiny::modalDialog(
@@ -372,6 +383,7 @@ shiny::shinyApp(
           easyClose = TRUE
         )
       )
+      
       sg$process()
       shiny::removeModal()
     })
@@ -445,7 +457,7 @@ shiny::shinyApp(
               multiple = TRUE,
               selected = vstore[["downscale_ssps"]]
             )
-          ),          
+          ),
           shiny::div(
             title = "20-year reference periods for GCM simulations.",
             shiny::selectInput(
@@ -536,7 +548,7 @@ shiny::shinyApp(
               label = "Reset",
               class = "btn btn-warning"
             ),
-            shiny::modalButton("Dismiss") # Default dismiss button
+            shiny::modalButton("Dismiss")
           )
         )
       )
@@ -546,27 +558,16 @@ shiny::shinyApp(
       downscale_modal()
     })
 
-    # Generic function to handle vstore updates and notifications
     update_vstore_and_notify <- function(vstore_key, input_value, msg_format) {
-
-      vpl <- 30  # Short variable name for value print limit
-
-      # Capture current value in vstore (NULL if not set)
+      vpl <- 30
       current_value <- vstore[[vstore_key]]
-
       if (is.null(input_value)) {
         input_value <- c()
         if (vstore_key == "downscale_core_vars") return()
       }
-      
-      # Calculate additions and deletions
       additions <- setdiff(input_value, current_value)
       deletions <- setdiff(current_value, input_value)
-      
-      # Update vstore with the new input value
       vstore[[vstore_key]] <- input_value
-      
-      # Determine the message based on additions or deletions
       if (length(additions) > 0) {
         diff_value <- substr(paste(additions, collapse = ", "), 1, vpl)
         shiny::showNotification(
@@ -582,55 +583,42 @@ shiny::shinyApp(
       }
     }
 
-    # Observe events using the generic function
     shiny::observeEvent(input$downscale_which_refmap, {
       update_vstore_and_notify("downscale_which_refmap", input$downscale_which_refmap, "Ref map")
     })
-    
     shiny::observeEvent(input$downscale_obs_periods, {
       update_vstore_and_notify("downscale_obs_periods", input$downscale_obs_periods, "Obs periods")
     })
-    
     shiny::observeEvent(input$downscale_obs_years, {
       update_vstore_and_notify("downscale_obs_years", input$downscale_obs_years, "Obs years")
     }, ignoreNULL = FALSE)
-    
     shiny::observeEvent(input$downscale_obs_ts_dataset, {
       update_vstore_and_notify("downscale_obs_ts_dataset", input$downscale_obs_ts_dataset, "Obs dataset")
     })
-    
     shiny::observeEvent(input$downscale_gcms, {
       update_vstore_and_notify("downscale_gcms", input$downscale_gcms, "GCMs")
     }, ignoreNULL = FALSE)
-    
     shiny::observeEvent(input$downscale_ssps, {
       update_vstore_and_notify("downscale_ssps", input$downscale_ssps, "SSPs")
     }, ignoreNULL = FALSE)
-    
     shiny::observeEvent(input$downscale_gcm_periods, {
       update_vstore_and_notify("downscale_gcm_periods", input$downscale_gcm_periods, "GCM periods")
     }, ignoreNULL = FALSE)
-    
     shiny::observeEvent(input$downscale_gcm_ssp_years, {
       update_vstore_and_notify("downscale_gcm_ssp_years", input$downscale_gcm_ssp_years, "GCM SSP years")
     }, ignoreNULL = FALSE)
-    
     shiny::observeEvent(input$downscale_gcm_hist_years, {
       update_vstore_and_notify("downscale_gcm_hist_years", input$downscale_gcm_hist_years, "GCM hist years")
     }, ignoreNULL = FALSE)
-    
     shiny::observeEvent(input$downscale_max_run, {
       update_vstore_and_notify("downscale_max_run", input$downscale_max_run, "Max run")
     })
-    
     shiny::observeEvent(input$downscale_run_nm, {
       update_vstore_and_notify("downscale_run_nm", input$downscale_run_nm, "Run name")
     }, ignoreNULL = FALSE)
-    
     shiny::observeEvent(input$downscale_core_vars, {
       update_vstore_and_notify("downscale_core_vars", input$downscale_core_vars, "Core vars")
     }, ignoreNULL = FALSE)
-    
     shiny::observeEvent(input$downscale_core_ppt_lr, {
       update_vstore_and_notify("downscale_core_ppt_lr", input$downscale_core_ppt_lr, "Core PPT LR")
     })
@@ -660,7 +648,7 @@ shiny::shinyApp(
       downscale_modal()
     })
 
-    shiny::observeEvent(c(vstore[["downscale_gcms"]],vstore[["downscale_ssps"]]), {
+    shiny::observeEvent(c(vstore[["downscale_gcms"]], vstore[["downscale_ssps"]]), {
       gcms <- vstore[["downscale_gcms"]]
       ssps <- vstore[["downscale_ssps"]]
       if (!length(gcms) && !length(ssps)) {
@@ -671,6 +659,7 @@ shiny::shinyApp(
         shiny::updateSelectInput(inputId = "downscale_run_nm", choices = climr::list_runs_ssp(gcm = gcms, ssp = ssps), selected = vstore[["downscale_run_nm"]])
       }
     })
+
     shiny::observeEvent(input$downscale_process, {
       output$downscale_points_count_estimate <- shiny::renderUI({
         pce <- sg$approx_count(vstore[["downscale_resolution"]])
@@ -691,12 +680,13 @@ shiny::shinyApp(
       })
       shiny::showModal(
         shiny::modalDialog(
-          title = "Preferences for Downscale Processing", size = "l", easyClose = TRUE, fade = FALSE, 
+          title = "Preferences for Downscale Processing", size = "l", easyClose = TRUE, fade = FALSE,
           shiny::div(
             title = "csv: all points are returned in csv. tif: Only shapes/rasters are returned as GeoTIFF if selected.",
             shiny::radioButtons(
               inputId = "downscale_output",
-              label =  "Downscale Output Format", c("Comma Separated Value (csv)" = "csv", "Geographic Tag Image File Format (GeoTIFF)" = "tif"),
+              label = "Downscale Output Format",
+              choices = c("Comma Separated Value (csv)" = "csv", "Geographic Tag Image File Format (GeoTIFF)" = "tif"),
               inline = TRUE,
               selected = vstore[["downscale_output"]]
             )
@@ -727,59 +717,90 @@ shiny::shinyApp(
         )
       )
     })
-    shiny::observeEvent(input$downscale_output, {vstore[["downscale_output"]] <- input$downscale_output})
-    shiny::observeEvent(input$downscale_resolution, {vstore[["downscale_resolution"]] <- input$downscale_resolution})
+    shiny::observeEvent(input$downscale_output, { vstore[["downscale_output"]] <- input$downscale_output })
+    shiny::observeEvent(input$downscale_resolution, { vstore[["downscale_resolution"]] <- input$downscale_resolution })
 
     # ---- Overlay events
-    shiny::observeEvent(input$selectoverlay, {
+    shiny::observeEvent(input$select_overlay, {
       shiny::showModal(
         shiny::modalDialog(
-          title = "Climate Overlay Selection", size = "xl", easyClose = TRUE, fade = FALSE,
+          title = "Climate Overlay Selection",
+          size = "xl",
+          easyClose = TRUE,
+          fade = FALSE,
           shiny::selectInput(
             inputId = "tifsource",
-            label =  "Source",
+            label = "Source",
             width = "100%",
             choices = names(climr_tif),
             selected = vstore[["tifsource"]]
           ),
-          shiny::radioButtons(
-            inputId = "temporality", "Temporality", c("Annual", "Seasonal", "Monthly"),
-            inline = TRUE,
-            selected = vstore[["temporality"]]
+          shiny::selectInput(
+            inputId = "element",
+            label = "Climate Element",
+            width = "100%",
+            choices = NULL
           ),
           shiny::selectInput(
-            inputId = "climatevar", 
-            label = "Variables (%s)" |> sprintf(vstore[["tifsource"]]),
-            selectize = TRUE,
+            inputId = "time",
+            label = "Time Period",
             width = "100%",
-            choices = c("None" = "NONE", climr_tif[[vstore[["tifsource"]]]][temporality %in% vstore[["temporality"]], setNames(url, label)]),
-            selected = vstore[["climatevar"]]
+            choices = NULL
+          ),
+          footer = shiny::tagList(
+            shiny::actionButton(
+              inputId = "load_overlay",
+              label = "Load",
+              icon = shiny::icon("droplet"),
+              class = "btn btn-primary"
+            ),
+            shiny::modalButton("Dismiss")
           )
         )
       )
     })
+
     shiny::observeEvent(input$tifsource, {
       vstore[["tifsource"]] <- input$tifsource
-      shiny::updateSelectInput(
-        inputId = "climatevar", label = "Variables (%s)" |> sprintf(vstore[["tifsource"]]),
-        choices = c("None" = "NONE", climr_tif[[vstore[["tifsource"]]]][temporality %in% vstore[["temporality"]], setNames(url, label)])
+      dt <- climr_tif[[input$tifsource]]
+      elements <- unique(dt[, list(element, category)])
+      basic <- elements[category == "Basic elements", element]
+      derived <- elements[category == "Derived elements", element]
+      annual <- elements[category == "Annual elements", element]
+      choices <- list(
+        "Basic elements" = setNames(basic, basic),
+        "Derived elements" = setNames(derived, derived),
+        "Annual elements" = setNames(annual, annual)
       )
+      shiny::updateSelectInput(session, "element", choices = choices, selected = basic[1])
     })
-    shiny::observeEvent(input$temporality, {
-      vstore[["temporality"]] <- input$temporality
-      shiny::updateSelectInput(
-        inputId = "climatevar",
-        choices = c("None" = "NONE", climr_tif[[vstore[["tifsource"]]]][temporality %in% vstore[["temporality"]], setNames(url, label)])
-      )
+
+    shiny::observeEvent(input$element, {
+      dt <- climr_tif[[input$tifsource]]
+      available_times <- dt[element == input$element, unique(time_code)]
+      time_choices <- time_labels[time_labels %in% available_times]
+      selected_time <- if ("" %in% available_times) "Annual" else time_choices[1]
+      shiny::updateSelectInput(session, "time", choices = time_choices, selected = selected_time)
     })
-    shiny::observeEvent(input$climatevar, {
-      vstore[["climatevar"]] <- input$climatevar
+
+    shiny::observeEvent(input$time, {
+      if (is.null(input$element) || is.null(input$time)) return()
+      dt <- climr_tif[[input$tifsource]]
+      url <- dt[element == input$element & time_code == input$time, url]
+      if (length(url) == 1) {
+        vstore[["climatevar"]] <- url
+      } else {
+        vstore[["climatevar"]] <- "NONE"
+      }
+    })
+
+    shiny::observeEvent(input$load_overlay, {
       mp <- leaflet::leafletProxy("climr")
       mp |> leaflet::clearGroup("Climate") |> leaflet::hideGroup("Climate")
       session$sendCustomMessage(type="jsCode", list(code= "$('#rasterValues-val').remove();"))
-      shiny::updateActionButton(inputId = "downloadoverlay", disabled = TRUE)
+      shiny::updateActionButton(inputId = "download_overlay", disabled = TRUE)
       if ("NONE" %in% vstore[["climatevar"]] | 0 == input$opacity) return()
-      shiny::updateActionButton(inputId = "downloadoverlay", disabled = FALSE)
+      shiny::updateActionButton(inputId = "download_overlay", disabled = FALSE)
       prefix <- vstore[["climatevar"]] |> basename() |> tools::file_path_sans_ext()
       fpal <- if (isTRUE(input$inverse)) rev else identity
       mp |> leafem::addGeotiff(
@@ -813,8 +834,9 @@ shiny::shinyApp(
       mp |> leaflet::showGroup("Climate")
       shiny::showNotification("Rendering %s values" |> sprintf(prefix), duration = 5)
     })
+
     shiny::observeEvent(input$opacity, {
-      session$sendCustomMessage(type="updateOpacity", list(category = "image", layerId = "val", opacity = input$opacity /100))
+      session$sendCustomMessage(type="updateOpacity", list(category = "image", layerId = "val", opacity = input$opacity / 100))
     })
     shiny::observeEvent(shiny::debounce(input$resolution, 500), {
       session$sendCustomMessage(type="updateResolution", list(category = "image", layerId = "val", resolution = input$resolution))
@@ -824,7 +846,7 @@ shiny::shinyApp(
         session$sendCustomMessage(type="jsCode", list(code= "$('.palselect').addClass('palselect-invert');"))
       } else {
         session$sendCustomMessage(type="jsCode", list(code= "$('.palselect').removeClass('palselect-invert');"))
-      }      
+      }
     })
     shiny::observe({
       fpal <- if (isTRUE(input$inverse)) rev else identity
@@ -835,9 +857,8 @@ shiny::shinyApp(
         )
       ))
     })
-    shiny::observeEvent(input$downloadoverlay, {
+    shiny::observeEvent(input$download_overlay, {
       session$sendCustomMessage(type="jsCode", list(code = "window.location.assign('%s');" |> sprintf(vstore[["climatevar"]])))
     })
-    
-    }
+  }
 )

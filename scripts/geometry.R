@@ -291,7 +291,32 @@ session_geometry <- function() {
         warning = function(w) {shiny::showNotification(ui = shiny::span(conditionMessage(w)), type = "warning")},
         tryCatch(
           {
+            
+            # Generate run_id once
+            run_id <- generate_run_id()
  
+            if (shiny::in_devmode()) {
+              saveRDS(
+                list(
+                  xyz = xyz,
+                  which_refmap = vstore[["downscale_which_refmap"]],
+                  obs_periods = vstore[["downscale_obs_periods"]] |> n(),
+                  obs_years  = vstore[["downscale_obs_years "]] |> n(),
+                  obs_ts_dataset = vstore[["downscale_obs_ts_dataset"]] |> n(),
+                  gcms = vstore[["downscale_gcms"]] |> n(),
+                  ssps = vstore[["downscale_ssps"]] |> n(),
+                  gcm_periods = vstore[["downscale_gcm_periods"]] |> n(),
+                  gcm_ssp_years = vstore[["downscale_gcm_ssp_years"]] |> n(),
+                  gcm_hist_years = vstore[["downscale_gcm_hist_years"]] |> n(),
+                  max_run = vstore[["downscale_max_run"]] |> n() |> as.integer(),
+                  run_nm = vstore[["downscale_run_nm"]] |> n(),
+                  vars = vstore[["downscale_core_vars"]] |> n(),
+                  ppt_lr = vstore[["downscale_core_ppt_lr"]]
+                ),
+                "run_%s.rds" |> sprintf(run_id)
+              )
+            }
+
             xyz <- create_points_dt(sg, cec, vstore[["downscale_resolution"]])
             n <- \(x) if (length(x) && !"NULL" %in% x) x
             res <- climr::downscale_db(
@@ -310,9 +335,6 @@ session_geometry <- function() {
               vars = vstore[["downscale_core_vars"]] |> n(),
               ppt_lr = vstore[["downscale_core_ppt_lr"]]
             )
-
-            # Generate run_id once
-            run_id <- generate_run_id()
 
             output$downscale_download <- shiny::downloadHandler(
               filename = function() {
