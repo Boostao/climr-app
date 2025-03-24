@@ -264,10 +264,16 @@ add_custom_render <- function(map) {
             var georaster = layer.options.georaster;
             var colorOptions = message.colorOptions;
             var scaleFunc = ({log: Math.log, log10: Math.log10, log1p: Math.log1p, log2: Math.log2}[message.vscale] || (x => x));
-      
             const cols = colorOptions.palette;
             let scale = chroma.scale(cols);
-            let domain = [scaleFunc(georaster.mins[0]), scaleFunc(georaster.maxs[0])];
+            let dmin = scaleFunc(georaster.mins[0]);
+            if (dmin === -Infinity || isNaN(dmin)) {
+              console.log(message.vscale);
+              console.log(georaster.mins[0]);
+              console.log(dmin);
+            }
+            let dmax = scaleFunc(georaster.maxs[0]);
+            let domain = [dmin, dmax];
             let nacol = colorOptions["na.color"];
             let clr = scale.domain(domain);
             pixelValuesToColorFn = values => {

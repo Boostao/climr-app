@@ -353,21 +353,9 @@ shiny::shinyApp(
     shiny::observeEvent(input$sg_remove, sg$rm(input$sg_remove))
     shiny::observeEvent(input$sg_view, sg$view(input$sg_view))
     shiny::observeEvent(input$downscale_process_launch, {
-      shiny::showModal(
-        shiny::modalDialog(
-          title = "Processing",
-          shiny::tags$div(
-            class = "text-center",
-            shiny::tags$div(class = "spinner-border text-primary", role = "status"),
-            shiny::tags$p("Processing downscale... Please wait.")
-          ),
-          footer = NULL,
-          easyClose = TRUE
-        )
-      )
-      
+      shiny::updateActionButton(inputId = downscale_process_launch, disable = TRUE)
       sg$process()
-      shiny::removeModal()
+      shiny::updateActionButton(inputId = downscale_process_launch, disable = FALSE)
     })
 
     # ---- Downscale events
@@ -854,13 +842,14 @@ shiny::shinyApp(
       ) |> leaflet::showGroup("Climate")
       
       output$vscale_overlay <- shiny::renderUI({
+        vstore[["vscale"]] <- NULL
         shiny::selectInput(
           inputId = "vscale",
           label = "Scale Adjustement",
           width = "100%",
           choices = {
             if (prefix %in% climr_ratios) {
-              c("None" = "none", "Log" = "log2")
+              c("None" = "none", "Log" = "log1p")
             } else {
               c("None" = "none")
             }
