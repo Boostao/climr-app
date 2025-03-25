@@ -30,12 +30,12 @@ mbhsstyle <- Sys.getenv("BCGOV_MAPBOX_HILLSHADE_STYLE")
 pals <- readRDS("scripts/pals.rds")
 
 # Elevation raster for missing values
-elevtif <- c(Sys.getenv("ELEV_RASTER"), "northamerica_elevation_cec_2023.tif")
+elevtif <- c(Sys.getenv("ELEV_RASTER"), "../northamerica_elevation_cec_2023.tif")
 if (!length(felev <- which(file.exists(elevtif)))) {
   curl::curl_download("http://www.cec.org/files/atlas_layers/0_reference/0_03_elevation/elevation_tif.zip", "elevation_tif.zip")
-  unzip("elevation_tif.zip", files = "Elevation_TIF/NA_Elevation/data/northamerica/northamerica_elevation_cec_2023.tif", junkpaths = TRUE)
+  unzip("elevation_tif.zip", files = "Elevation_TIF/NA_Elevation/data/northamerica/northamerica_elevation_cec_2023.tif", junkpaths = TRUE, exdir = "..")
   unlink("elevation_tif.zip")
-  cec <- terra::rast("northamerica_elevation_cec_2023.tif")
+  cec <- terra::rast("../northamerica_elevation_cec_2023.tif")
 } else {
   cec <- terra::rast(elevtif[felev])
 }
@@ -337,7 +337,8 @@ shiny::shinyApp(
       downscale_core_ppt_lr = downscale_default[["downscale_core_ppt_lr"]],
       downscale_output = "csv",
       downscale_resolution = 2500,
-      vscale = "none"
+      vscale = "none",
+      processing = FALSE
     )
 
     # ---- Geometry
@@ -353,9 +354,8 @@ shiny::shinyApp(
     shiny::observeEvent(input$sg_remove, sg$rm(input$sg_remove))
     shiny::observeEvent(input$sg_view, sg$view(input$sg_view))
     shiny::observeEvent(input$downscale_process_launch, {
-      shiny::updateActionButton(inputId = downscale_process_launch, disable = TRUE)
+      if (vstore[["processing"]]) return()
       sg$process()
-      shiny::updateActionButton(inputId = downscale_process_launch, disable = FALSE)
     })
 
     # ---- Downscale events
@@ -631,6 +631,7 @@ shiny::shinyApp(
     })
 
     shiny::observeEvent(input$downscale_process, {
+      vstore[["processing"]] <- FALSE
       output$downscale_points_count_estimate <- shiny::renderUI({
         pce <- sg$approx_count(vstore[["downscale_resolution"]])
         bslib::card(

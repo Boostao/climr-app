@@ -315,6 +315,10 @@ report_msg <- function(msgs, type = c("info", "danger")) {
     "danger" = "Climr encountered problems:"
   )
 
+  if (!shiny::devmode() & type %in% "danger") {
+    msgs <- "Error with climr: file issue at http://www.github.com/bcgov/climr-app"
+  }
+
   msgs_html <- tags$div(
     class = "alert alert-%s" |> sprintf(type),
     tags$h4(class = "alert-heading", hd[type]),
@@ -358,6 +362,7 @@ create_points_dt <- function(sg, cec, resolution) {
   # Split indices by group
   marker_idx <- which(sg$group == "marker")
   shape_idx <- which(sg$group == "shape")
+  hull <- NULL
   
   # Process markers
   if (length(marker_idx) > 0) {
@@ -372,6 +377,7 @@ create_points_dt <- function(sg, cec, resolution) {
       lat = coords[, 2],
       elev = elevs
     )
+    hull <- terra::convHull(marker_geoms)
   } else {
     marker_dt <- data.table::data.table()
   }
@@ -410,6 +416,14 @@ create_points_dt <- function(sg, cec, resolution) {
           lat = coords_wgs84[, 2],
           elev = elevs
         )
+        hull <- if (is.null(hull)) {
+          terra::convHull(shape_geoms)
+        } else {
+          if (length(marker_idx) == 1) {
+            hull <- terra::buffer(hull, 0.001, quadsegs = 1, capstyle = "square")
+          }
+          terra::union(hull, terra::convHull(shape_geoms)) |> terra::convHull()
+        }
         return(shape_dt)
       }
       return(data.table::data.table())
@@ -418,9 +432,12 @@ create_points_dt <- function(sg, cec, resolution) {
   } else {
     grid_list <- list(data.table::data.table())
   }
-    
+
   # Combine all grids and track original shape index
   out_dt <- data.table::rbindlist(c(list(out_dt, marker_dt), grid_list), use.names = TRUE)
   data.table::set(out_dt, j = "id", value = seq_len(nrow(out_dt)))
+  if (!is.null(hull)) {
+    attr(out_dt, "hull") <- hull |> terra::geom(wkt = TRUE)
+  }
   return(out_dt)
 }

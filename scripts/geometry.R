@@ -286,15 +286,20 @@ session_geometry <- function() {
 
     },
     process = function() {
+      vstore[["processing"]] <- TRUE
+      shiny::removeModal()
+      shiny::updateActionButton(inputId = "downscale_process", disabled = TRUE)
       withCallingHandlers(
         message = function(m) {shiny::showNotification(ui = shiny::span(conditionMessage(m)), type = "message")},
         warning = function(w) {shiny::showNotification(ui = shiny::span(conditionMessage(w)), type = "warning")},
-        tryCatch(
+      #   tryCatch(
           {
             
             # Generate run_id once
             run_id <- generate_run_id()
- 
+            xyz <- create_points_dt(sg, cec, vstore[["downscale_resolution"]])
+            n <- \(x) if (length(x) && !"NULL" %in% x) x
+
             if (shiny::in_devmode()) {
               saveRDS(
                 list(
@@ -313,12 +318,10 @@ session_geometry <- function() {
                   vars = vstore[["downscale_core_vars"]] |> n(),
                   ppt_lr = vstore[["downscale_core_ppt_lr"]]
                 ),
-                "run_%s.rds" |> sprintf(run_id)
+                "../run_%s.rds" |> sprintf(run_id)
               )
             }
 
-            xyz <- create_points_dt(sg, cec, vstore[["downscale_resolution"]])
-            n <- \(x) if (length(x) && !"NULL" %in% x) x
             res <- climr::downscale_db(
               xyz = xyz,
               which_refmap = vstore[["downscale_which_refmap"]],
@@ -359,12 +362,15 @@ session_geometry <- function() {
 
             session$sendCustomMessage(type="jsCode", list(code = "$('.input-control-body a.shiny-download-link').addClass('btn-success');"))
             shiny::showNotification("Downscale process completed. You can now download the results.", type = "message")
-
-          },
-          error = function(e) {
-            report_msg(conditionMessage(e), type = "danger")
+            vstore[["processing"]] <- FALSE
+            shiny::updateActionButton(inputId = "downscale_process", disabled = FALSE)
+      #     },
+      #     error = function(e) {
+      #       vstore[["processing"]] <- FALSE
+      #       shiny::updateActionButton(inputId = "downscale_process", disabled = FALSE)
+      #       report_msg("%s: %s" |> sprintf(conditionCall(e) |> as.character(), conditionMessage(e)), type = "danger")
           }
-        )
+      #   )
       )
     },
     get = function() {
