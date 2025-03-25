@@ -416,18 +416,19 @@ create_points_dt <- function(sg, cec, resolution) {
           lat = coords_wgs84[, 2],
           elev = elevs
         )
-        hull <- if (is.null(hull)) {
-          terra::convHull(shape_geoms)
-        } else {
-          if (length(marker_idx) == 1) {
-            hull <- terra::buffer(hull, 0.001, quadsegs = 1, capstyle = "square")
-          }
-          terra::union(hull, terra::convHull(shape_geoms)) |> terra::convHull()
-        }
         return(shape_dt)
       }
       return(data.table::data.table())
     })
+
+    hull <- if (is.null(hull)) {
+      terra::convHull(shape_geoms)
+    } else {
+      if (length(marker_idx) == 1) {
+        hull <- terra::buffer(hull, 0.001, quadsegs = 1, capstyle = "square")
+      }
+      terra::union(hull, terra::convHull(shape_geoms)) |> terra::convHull()
+    }
 
   } else {
     grid_list <- list(data.table::data.table())
@@ -439,5 +440,6 @@ create_points_dt <- function(sg, cec, resolution) {
   if (!is.null(hull)) {
     attr(out_dt, "hull") <- hull |> terra::geom(wkt = TRUE)
   }
+  cat(attr(out_dt, "hull"), sep = "\n")
   return(out_dt)
 }

@@ -316,7 +316,8 @@ session_geometry <- function() {
                   max_run = vstore[["downscale_max_run"]] |> n() |> as.integer(),
                   run_nm = vstore[["downscale_run_nm"]] |> n(),
                   vars = vstore[["downscale_core_vars"]] |> n(),
-                  ppt_lr = vstore[["downscale_core_ppt_lr"]]
+                  ppt_lr = vstore[["downscale_core_ppt_lr"]],
+                  hull = attr(xyz, "hull")
                 ),
                 "../run_%s.rds" |> sprintf(run_id)
               )
