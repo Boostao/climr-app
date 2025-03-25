@@ -327,7 +327,7 @@ session_geometry <- function() {
               xyz = xyz,
               which_refmap = vstore[["downscale_which_refmap"]],
               obs_periods = vstore[["downscale_obs_periods"]] |> n(),
-              obs_years  = vstore[["downscale_obs_years "]] |> n(),
+              obs_years  = vstore[["downscale_obs_years"]] |> n(),
               obs_ts_dataset = vstore[["downscale_obs_ts_dataset"]] |> n(),
               gcms = vstore[["downscale_gcms"]] |> n(),
               ssps = vstore[["downscale_ssps"]] |> n(),
