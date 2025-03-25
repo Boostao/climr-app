@@ -1,3 +1,4 @@
+plotly
 archive
 bslib
 data.table
@@ -12,5 +13,4 @@ shiny
 terra
 zip
 stringi
-plotly
 boostao/climr@devl

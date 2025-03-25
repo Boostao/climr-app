@@ -440,6 +440,5 @@ create_points_dt <- function(sg, cec, resolution) {
   if (!is.null(hull)) {
     attr(out_dt, "hull") <- hull |> terra::geom(wkt = TRUE)
   }
-  cat(attr(out_dt, "hull"), sep = "\n")
   return(out_dt)
 }
