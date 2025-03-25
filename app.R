@@ -346,17 +346,13 @@ shiny::shinyApp(
     sg <- session_geometry()
 
     # ---- Map events
-    shiny::observeEvent(input$climr_draw_start, sg$add_point_enabled(FALSE))
+    shiny::observeEvent(input$climr_draw_start, {if (shiny::in_devmode()) cat("Event: climr_draw_start", sep = "\n"); sg$add_point_enabled(FALSE)})
     shiny::observeEvent(input$climr_draw_stop, sg$add_point_enabled(TRUE))
     shiny::observeEvent(input$climr_draw_new_feature, sg$add_draw_poly(input$climr_draw_new_feature))
     shiny::observeEvent(input$climr_click, sg$add_point(input$climr_click$lat, input$climr_click$lng))
     shiny::observeEvent(input$upload, sg$add_file(input$upload))
     shiny::observeEvent(input$sg_remove, sg$rm(input$sg_remove))
     shiny::observeEvent(input$sg_view, sg$view(input$sg_view))
-    shiny::observeEvent(input$downscale_process_launch, {
-      if (vstore[["processing"]]) return()
-      sg$process()
-    })
 
     # ---- Downscale events
     downscale_modal <- function() {
@@ -690,6 +686,12 @@ shiny::shinyApp(
     })
     shiny::observeEvent(input$downscale_output, { vstore[["downscale_output"]] <- input$downscale_output })
     shiny::observeEvent(input$downscale_resolution, { vstore[["downscale_resolution"]] <- input$downscale_resolution })
+    shiny::observeEvent(input$downscale_process_launch, {
+      if (vstore[["processing"]]) return()
+      vstore[["processing"]] <- TRUE
+      sg$process()
+      vstore[["processing"]] <- FALSE
+    })
 
     # ---- Overlay events
     shiny::observeEvent(input$select_overlay, {
