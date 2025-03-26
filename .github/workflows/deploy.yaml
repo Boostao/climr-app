@@ -14,6 +14,7 @@ jobs:
       - uses: actions/checkout@main
       - name: copy app over
         run: |
+          rm -f -R /tmp/Rtmp*
           apt update -y -qq
           rm -f -R /srv/shiny-server/climr-app || true
           cp .Renviron ~/.Renviron
