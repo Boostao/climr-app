@@ -1,4 +1,3 @@
-
 # Setup ----
 suppressPackageStartupMessages({
   library(archive)
@@ -36,6 +35,8 @@ if (!length(felev <- which(file.exists(elevtif)))) {
   unzip("elevation_tif.zip", files = "Elevation_TIF/NA_Elevation/data/northamerica/northamerica_elevation_cec_2023.tif", junkpaths = TRUE, exdir = "..")
   unlink("elevation_tif.zip")
   cec <- terra::rast("../northamerica_elevation_cec_2023.tif")
+  cec <- terra::project(cec, "EPSG:4326")
+  terra::writeRaster(cec, "../northamerica_elevation_cec_2023.tif", overwrite = TRUE)
 } else {
   cec <- terra::rast(elevtif[felev])
 }
@@ -304,16 +305,16 @@ shiny::shinyApp(
     downscale_default <- list(
       downscale_which_refmap = "refmap_climr",
       downscale_obs_periods = "2001_2020",
-      downscale_obs_years = c(),
+      downscale_obs_years = "NULL",
       downscale_obs_ts_dataset = "NULL",
-      downscale_gcms = c(),
-      downscale_ssps = c(),
-      downscale_gcm_periods = c(),
-      downscale_gcm_ssp_years = c(),
-      downscale_gcm_hist_years = c(),
+      downscale_gcms = "NULL",
+      downscale_ssps = "NULL",
+      downscale_gcm_periods = "NULL",
+      downscale_gcm_ssp_years = "NULL",
+      downscale_gcm_hist_years = "NULL",
       downscale_max_run = 0,
-      downscale_run_nm = c(),
-      downscale_core_vars = sort(sprintf(c("PPT_%02d", "Tmax_%02d", "Tmin_%02d"), sort(rep(1:12, 3)))),
+      downscale_run_nm = "NULL",
+      downscale_extra_vars = "NULL",
       downscale_core_ppt_lr = FALSE
     )
 
@@ -333,7 +334,7 @@ shiny::shinyApp(
       downscale_gcm_hist_years = downscale_default[["downscale_gcm_hist_years"]],
       downscale_max_run = downscale_default[["downscale_max_run"]],
       downscale_run_nm = downscale_default[["downscale_run_nm"]],
-      downscale_core_vars = downscale_default[["downscale_core_vars"]],
+      downscale_extra_vars = downscale_default[["downscale_extra_vars"]],
       downscale_core_ppt_lr = downscale_default[["downscale_core_ppt_lr"]],
       downscale_output = "csv",
       downscale_resolution = 2500,
@@ -346,13 +347,34 @@ shiny::shinyApp(
     sg <- session_geometry()
 
     # ---- Map events
-    shiny::observeEvent(input$climr_draw_start, {if (shiny::in_devmode()) cat("Event: climr_draw_start", sep = "\n"); sg$add_point_enabled(FALSE)})
-    shiny::observeEvent(input$climr_draw_stop, sg$add_point_enabled(TRUE))
-    shiny::observeEvent(input$climr_draw_new_feature, sg$add_draw_poly(input$climr_draw_new_feature))
-    shiny::observeEvent(input$climr_click, sg$add_point(input$climr_click$lat, input$climr_click$lng))
-    shiny::observeEvent(input$upload, sg$add_file(input$upload))
-    shiny::observeEvent(input$sg_remove, sg$rm(input$sg_remove))
-    shiny::observeEvent(input$sg_view, sg$view(input$sg_view))
+    shiny::observeEvent(input$climr_draw_start, {
+      if (shiny::in_devmode()) cat("Event: climr_draw_start", sep = "\n")
+      sg$add_point_enabled(FALSE)
+    })
+    shiny::observeEvent(input$climr_draw_stop, {
+      if (shiny::in_devmode()) cat("Event: climr_draw_stop", sep = "\n")
+      sg$add_point_enabled(TRUE)
+    })
+    shiny::observeEvent(input$climr_draw_new_feature, {
+      if (shiny::in_devmode()) cat("Event: climr_draw_new_feature", sep = "\n")
+      sg$add_draw_poly(input$climr_draw_new_feature)
+    })
+    shiny::observeEvent(input$climr_click, {
+      if (shiny::in_devmode()) cat("Event: climr_click", sep = "\n")
+      sg$add_point(input$climr_click$lat, input$climr_click$lng)
+    })
+    shiny::observeEvent(input$upload, {
+      if (shiny::in_devmode()) cat("Event: upload", sep = "\n")
+      sg$add_file(input$upload)
+    })
+    shiny::observeEvent(input$sg_remove, {
+      if (shiny::in_devmode()) cat("Event: sg_remove", sep = "\n")
+      sg$rm(input$sg_remove)
+    })
+    shiny::observeEvent(input$sg_view, {
+      if (shiny::in_devmode()) cat("Event: sg_view", sep = "\n")
+      sg$view(input$sg_view)
+    })
 
     # ---- Downscale events
     downscale_modal <- function() {
@@ -377,7 +399,7 @@ shiny::shinyApp(
               inputId = "downscale_obs_periods",
               label = "Observation periods",
               width = "100%",
-              choices = c("Null" = "NULL", climr::list_obs_periods()),
+              choices = list("Options" = climr::list_obs_periods(), "Remove all" = c("null" = "NULL")),
               selected = vstore[["downscale_obs_periods"]]
             )
           ),
@@ -387,7 +409,7 @@ shiny::shinyApp(
               inputId = "downscale_obs_years",
               label = "Observation years",
               width = "100%",
-              choices = climr::list_obs_years(),
+              choices = list("Options" = climr::list_obs_years(), "Remove all" = c("null" = "NULL")),
               multiple = TRUE,
               selected = vstore[["downscale_obs_years"]]
             )
@@ -399,7 +421,7 @@ shiny::shinyApp(
               label = "Observation time-series data",
               width = "100%",
               selected = vstore[["downscale_obs_ts_dataset"]],
-              choices = c("Null" = "NULL", "ClimateNA" = "climatena", "Climatic Research Unit / Global Precipitation Climatology Centre" = "cru.gpcc")
+              choices = c("null" = "NULL", "ClimateNA" = "climatena", "Climatic Research Unit / Global Precipitation Climatology Centre" = "cru.gpcc")
             )
           ),
           shiny::div(
@@ -408,7 +430,7 @@ shiny::shinyApp(
               inputId = "downscale_gcms",
               label = "Global climate model",
               width = "100%",
-              choices = climr::list_gcms(),
+              choices = list("Options" = climr::list_gcms(), "Remove all" = c("null" = "NULL")),
               multiple = TRUE,
               selected = vstore[["downscale_gcms"]]
             )
@@ -419,7 +441,7 @@ shiny::shinyApp(
               inputId = "downscale_ssps",
               label = "Shared Socio-economic Pathways (SSP) - Representative Concentration Pathways (RCP) Scenarios",
               width = "100%",
-              choices = climr::list_ssps(),
+              choices = list("Options" = climr::list_ssps(), "Remove all" = c("null" = "NULL")),
               multiple = TRUE,
               selected = vstore[["downscale_ssps"]]
             )
@@ -430,7 +452,7 @@ shiny::shinyApp(
               inputId = "downscale_gcm_periods",
               label = "General Circulation Model (GCM) Periods",
               width = "100%",
-              choices = climr::list_gcm_periods(),
+              choices = list("Options" = climr::list_gcm_periods(), "Remove all" = c("null" = "NULL")),
               multiple = TRUE,
               selected = vstore[["downscale_gcm_periods"]]
             )
@@ -441,7 +463,7 @@ shiny::shinyApp(
               inputId = "downscale_gcm_ssp_years",
               label = "General circulation model (GCM) Shared Socio-economic Pathways (SSP) Years",
               width = "100%",
-              choices = climr::list_gcm_ssp_years(),
+              choices = list("Options" = climr::list_gcm_ssp_years(), "Remove all" = c("null" = "NULL")),
               multiple = TRUE,
               selected = vstore[["downscale_gcm_ssp_years"]]
             )
@@ -452,7 +474,7 @@ shiny::shinyApp(
               inputId = "downscale_gcm_hist_years",
               label = "General circulation model (GCM) Historical Years",
               width = "100%",
-              choices = climr::list_gcm_hist_years(),
+              choices = list("Options" = climr::list_gcm_hist_years(), "Remove all" = c("null" = "NULL")),
               multiple = TRUE,
               selected = vstore[["downscale_gcm_hist_years"]]
             )
@@ -474,7 +496,7 @@ shiny::shinyApp(
               inputId = "downscale_run_nm",
               label = "Name of specified runs",
               width = "100%",
-              choices = {
+              choices = list("Options" = {
                 gcms <- vstore[["downscale_gcms"]]
                 ssps <- vstore[["downscale_ssps"]]
                 if (!length(gcms) && !length(ssps)) {
@@ -484,20 +506,20 @@ shiny::shinyApp(
                 } else if (length(gcms) && length(ssps)) {
                   climr::list_runs_ssp(gcm = gcms, ssp = ssps)
                 }
-              },
+              }, "Remove all" = c("null" = "NULL")),
               multiple = TRUE,
               selected = vstore[["downscale_run_nm"]]
             )
           ),
           shiny::div(
-            title = "Climate variables to compute. Defaults to monthly PPT, Tmax, Tmin if not specified.",
+            title = "Extra Climate variables to compute. Defaults to monthly PPT, Tmax, Tmin if not specified.",
             shiny::selectizeInput(
-              inputId = "downscale_core_vars",
-              label = "Climate variables",
+              inputId = "downscale_extra_vars",
+              label = "Extra Climate variables",
               width = "100%",
-              choices = climr::list_vars(),
+              choices = c(downscale_extra_vars, list("Remove all" = c("null" = "NULL"))),
               multiple = TRUE,
-              selected = vstore[["downscale_core_vars"]]
+              selected = vstore[["downscale_extra_vars"]]
             )
           ),
           shiny::div(
@@ -521,16 +543,24 @@ shiny::shinyApp(
     }
 
     shiny::observeEvent(input$downscale_parameters, {
+      if (shiny::in_devmode()) cat("Event: downscale_parameters", sep = "\n")
       downscale_modal()
     })
 
     update_vstore_and_notify <- function(vstore_key, input_value, msg_format) {
       vpl <- 30
       current_value <- vstore[[vstore_key]]
-      if (is.null(input_value)) {
-        input_value <- c()
-        if (vstore_key == "downscale_core_vars") return()
+      if ("NULL" %in% input_value) {
+        if (length(input_value) > 1) {
+          if ("NULL" %in% current_value) {
+            shiny::updateSelectInput(inputId = vstore_key, selected = setdiff(input_value, "NULL"))
+          } else {
+            shiny::updateSelectInput(inputId = vstore_key, selected = "NULL")
+          }
+          return()
+        }
       }
+      
       additions <- setdiff(input_value, current_value)
       deletions <- setdiff(current_value, input_value)
       vstore[[vstore_key]] <- input_value
@@ -550,46 +580,62 @@ shiny::shinyApp(
     }
 
     shiny::observeEvent(input$downscale_which_refmap, {
+      if (shiny::in_devmode()) cat("Event: downscale_which_refmap", sep = "\n")
       update_vstore_and_notify("downscale_which_refmap", input$downscale_which_refmap, "Ref map")
     })
     shiny::observeEvent(input$downscale_obs_periods, {
+      if (shiny::in_devmode()) cat("Event: downscale_obs_periods", sep = "\n")
       update_vstore_and_notify("downscale_obs_periods", input$downscale_obs_periods, "Obs periods")
     })
     shiny::observeEvent(input$downscale_obs_years, {
+      if (shiny::in_devmode()) cat("Event: downscale_obs_years", sep = "\n")
       update_vstore_and_notify("downscale_obs_years", input$downscale_obs_years, "Obs years")
-    }, ignoreNULL = FALSE)
+    })
     shiny::observeEvent(input$downscale_obs_ts_dataset, {
+      if (shiny::in_devmode()) cat("Event: downscale_obs_ts_dataset", sep = "\n")
       update_vstore_and_notify("downscale_obs_ts_dataset", input$downscale_obs_ts_dataset, "Obs dataset")
     })
     shiny::observeEvent(input$downscale_gcms, {
+      if (shiny::in_devmode()) cat("Event: downscale_gcms", sep = "\n")
       update_vstore_and_notify("downscale_gcms", input$downscale_gcms, "GCMs")
-    }, ignoreNULL = FALSE)
+      update_run_nm_select()
+    })
     shiny::observeEvent(input$downscale_ssps, {
+      if (shiny::in_devmode()) cat("Event: downscale_ssps", sep = "\n")
       update_vstore_and_notify("downscale_ssps", input$downscale_ssps, "SSPs")
-    }, ignoreNULL = FALSE)
+      update_run_nm_select()
+    })
     shiny::observeEvent(input$downscale_gcm_periods, {
+      if (shiny::in_devmode()) cat("Event: downscale_gcm_periods", sep = "\n")
       update_vstore_and_notify("downscale_gcm_periods", input$downscale_gcm_periods, "GCM periods")
-    }, ignoreNULL = FALSE)
+    })
     shiny::observeEvent(input$downscale_gcm_ssp_years, {
+      if (shiny::in_devmode()) cat("Event: downscale_gcm_ssp_years", sep = "\n")
       update_vstore_and_notify("downscale_gcm_ssp_years", input$downscale_gcm_ssp_years, "GCM SSP years")
-    }, ignoreNULL = FALSE)
+    })
     shiny::observeEvent(input$downscale_gcm_hist_years, {
+      if (shiny::in_devmode()) cat("Event: downscale_gcm_hist_years", sep = "\n")
       update_vstore_and_notify("downscale_gcm_hist_years", input$downscale_gcm_hist_years, "GCM hist years")
-    }, ignoreNULL = FALSE)
+    })
     shiny::observeEvent(input$downscale_max_run, {
+      if (shiny::in_devmode()) cat("Event: downscale_max_run", sep = "\n")
       update_vstore_and_notify("downscale_max_run", input$downscale_max_run, "Max run")
     })
     shiny::observeEvent(input$downscale_run_nm, {
+      if (shiny::in_devmode()) cat("Event: downscale_run_nm", sep = "\n")
       update_vstore_and_notify("downscale_run_nm", input$downscale_run_nm, "Run name")
-    }, ignoreNULL = FALSE)
-    shiny::observeEvent(input$downscale_core_vars, {
-      update_vstore_and_notify("downscale_core_vars", input$downscale_core_vars, "Core vars")
-    }, ignoreNULL = FALSE)
+    })
+    shiny::observeEvent(input$downscale_extra_vars, {
+      if (shiny::in_devmode()) cat("Event: downscale_extra_vars", sep = "\n")
+      update_vstore_and_notify("downscale_extra_vars", input$downscale_extra_vars, "Core vars")
+    })
     shiny::observeEvent(input$downscale_core_ppt_lr, {
+      if (shiny::in_devmode()) cat("Event: downscale_core_ppt_lr", sep = "\n")
       update_vstore_and_notify("downscale_core_ppt_lr", input$downscale_core_ppt_lr, "Core PPT LR")
     })
 
     shiny::observeEvent(input$downscale_reset, {
+      if (shiny::in_devmode()) cat("Event: downscale_reset", sep = "\n")
       shiny::showModal(
         shiny::modalDialog(
           title = "Confirm Reset",
@@ -604,6 +650,7 @@ shiny::shinyApp(
     })
     
     shiny::observeEvent(input$confirm_reset_yes, {
+      if (shiny::in_devmode()) cat("Event: confirm_reset_yes", sep = "\n")
       lapply(names(downscale_default), \(x) {
         vstore[[x]] <- downscale_default[[x]]
       })
@@ -611,22 +658,31 @@ shiny::shinyApp(
     })
 
     shiny::observeEvent(input$confirm_reset_no, {
+      if (shiny::in_devmode()) cat("Event: confirm_reset_no", sep = "\n")
       downscale_modal()
     })
 
-    shiny::observeEvent(c(vstore[["downscale_gcms"]], vstore[["downscale_ssps"]]), {
+    update_run_nm_select <- function() {
       gcms <- vstore[["downscale_gcms"]]
       ssps <- vstore[["downscale_ssps"]]
       if (!length(gcms) && !length(ssps)) {
-        shiny::updateSelectInput(inputId = "downscale_run_nm", choices = c(), selected = vstore[["downscale_run_nm"]])
+        opt_choices <- c()
       } else if (length(gcms) && !length(ssps)) {
-        shiny::updateSelectInput(inputId = "downscale_run_nm", choices = climr::list_runs_historic(gcm = gcms), selected = vstore[["downscale_run_nm"]])
+        opt_choices <- climr::list_runs_historic(gcm = gcms)
       } else if (length(gcms) && length(ssps)) {
-        shiny::updateSelectInput(inputId = "downscale_run_nm", choices = climr::list_runs_ssp(gcm = gcms, ssp = ssps), selected = vstore[["downscale_run_nm"]])
+        opt_choices <- climr::list_runs_ssp(gcm = gcms, ssp = ssps)
       }
-    })
+      choices <- list("Options" = opt_choices, "Remove all" = c("null" = "NULL"))
+      if (all(vstore[["downscale_run_nm"]] %in% unlist(choices))) {
+        select <- vstore[["downscale_run_nm"]]
+      } else {
+        select <- NULL
+      }
+      shiny::updateSelectInput(inputId = "downscale_run_nm", choices = choices, selected = select)
+    }
 
     shiny::observeEvent(input$downscale_process, {
+      if (shiny::in_devmode()) cat("Event: downscale_process", sep = "\n")
       vstore[["processing"]] <- FALSE
       output$downscale_points_count_estimate <- shiny::renderUI({
         pce <- sg$approx_count(vstore[["downscale_resolution"]])
@@ -684,17 +740,23 @@ shiny::shinyApp(
         )
       )
     })
-    shiny::observeEvent(input$downscale_output, { vstore[["downscale_output"]] <- input$downscale_output })
-    shiny::observeEvent(input$downscale_resolution, { vstore[["downscale_resolution"]] <- input$downscale_resolution })
+    shiny::observeEvent(input$downscale_output, {
+      if (shiny::in_devmode()) cat("Event: downscale_output", sep = "\n")
+      vstore[["downscale_output"]] <- input$downscale_output
+    })
+    shiny::observeEvent(input$downscale_resolution, {
+      if (shiny::in_devmode()) cat("Event: downscale_resolution", sep = "\n")
+      vstore[["downscale_resolution"]] <- input$downscale_resolution
+    })
     shiny::observeEvent(input$downscale_process_launch, {
+      if (shiny::in_devmode()) cat("Event: downscale_process_launch", sep = "\n")
       if (vstore[["processing"]]) return()
-      vstore[["processing"]] <- TRUE
       sg$process()
-      vstore[["processing"]] <- FALSE
     })
 
     # ---- Overlay events
     shiny::observeEvent(input$select_overlay, {
+      if (shiny::in_devmode()) cat("Event: select_overlay", sep = "\n")
       output$vscale_overlay <- NULL
       shiny::showModal(
         shiny::modalDialog(
@@ -760,6 +822,7 @@ shiny::shinyApp(
     })
 
     shiny::observeEvent(input$tifsource, {
+      if (shiny::in_devmode()) cat("Event: tifsource", sep = "\n")
       vstore[["tifsource"]] <<- input$tifsource
       dt <- climr_tif[[vstore[["tifsource"]]]]
       elements <- unique(dt[, list(element, category, label)])
@@ -775,6 +838,7 @@ shiny::shinyApp(
     })
 
     shiny::observeEvent(input$element, {
+      if (shiny::in_devmode()) cat("Event: element", sep = "\n")
       vstore[["element"]] <<- input$element
       dt <- climr_tif[[vstore[["tifsource"]]]]
       available_times <- dt[element %in% input$element, unique(time_code)]
@@ -790,6 +854,7 @@ shiny::shinyApp(
     })
 
     shiny::observeEvent(input$time, {
+      if (shiny::in_devmode()) cat("Event: time", sep = "\n")
       vstore[["time"]] <<- input$time
       if (is.null(input$element) || is.null(input$time)) return()
       dt <- climr_tif[[vstore[["tifsource"]]]]
@@ -802,6 +867,7 @@ shiny::shinyApp(
     })
 
     shiny::observeEvent(input$load_overlay, {
+      if (shiny::in_devmode()) cat("Event: load_overlay", sep = "\n")
       mp <- leaflet::leafletProxy("climr", deferUntilFlush = FALSE)
       mp |> leaflet::clearGroup("Climate") |> leaflet::hideGroup("Climate")
       session$sendCustomMessage(type="jsCode", list(code= "$('#rasterValues-val').remove();"))
@@ -864,16 +930,20 @@ shiny::shinyApp(
     })
 
     shiny::observeEvent(input$vscale, {
+      if (shiny::in_devmode()) cat("Event: vscale", sep = "\n")
       vstore[["vscale"]] <- input$vscale
     })
 
     shiny::observeEvent(input$opacity, {
+      if (shiny::in_devmode()) cat("Event: opacity", sep = "\n")
       session$sendCustomMessage(type="updateOpacity", list(category = "image", layerId = "val", opacity = input$opacity / 100))
     })
     shiny::observeEvent(shiny::debounce(input$resolution, 500), {
+      if (shiny::in_devmode()) cat("Event: resolution (debounced)", sep = "\n")
       session$sendCustomMessage(type="updateResolution", list(category = "image", layerId = "val", resolution = input$resolution))
     })
     shiny::observeEvent(input$inverse, {
+      if (shiny::in_devmode()) cat("Event: inverse", sep = "\n")
       if (isTRUE(input$inverse)) {
         session$sendCustomMessage(type="jsCode", list(code= "$('.palselect').addClass('palselect-invert');"))
       } else {
@@ -890,6 +960,7 @@ shiny::shinyApp(
       ))
     })
     shiny::observeEvent(input$download_overlay, {
+      if (shiny::in_devmode()) cat("Event: download_overlay", sep = "\n")
       session$sendCustomMessage(type="jsCode", list(code = "window.location.assign('%s');" |> sprintf(vstore[["climatevar"]])))
     })
   }

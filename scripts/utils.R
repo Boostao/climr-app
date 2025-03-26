@@ -49,42 +49,6 @@ url_process <- function(tif_url) {
 labelf <- function(fcontent) {
   seasons <- c("wt" = "Winter", "sp" = "Spring", "sm" = "Summer", "at" = "Autumn")
   months <- setNames(month.name, sprintf("%02d", 1:12))
-  climatevars <- c(
-    "Tave" = "mean temperatures (°C)",
-    "Tmax" = "maximum mean temperatures (°C)",
-    "Tmin" = "minimum mean temperatures (°C)",
-    "PPT" = "precipitation (mm)",
-    "Rad" = "solar radiation (MJ m-2 d-1)",
-    "MAT" = "mean annual temperature (°C)",
-    "MWMT" = "mean warmest month temperature (°C)",
-    "MCMT" = "mean coldest month temperature (°C)",
-    "TD" = "temperature difference between MWMT and MCMT, or continentality (°C)",
-    "MAP" = "mean annual precipitation (mm)",
-    "MSP" = "mean annual summer (May to Sept.) precipitation (mm)",
-    "AHM" = "annual heat-moisture index (MAT+10)/(MAP/1000))",
-    "SHM" = "summer heat-moisture index ((MWMT)/(MSP/1000))",
-    "DD_0" = "degree-days below 0°C, chilling degree-days",
-    "DDsub0" = "degree-days below 0°C, chilling degree-days",
-    "DD5" = "degree-days above 5°C, growing degree-days",
-    "DD_18" = "degree-days below 18°C, heating degree-days",
-    "DDsub18" = "degree-days below 18°C, heating degree-days",
-    "DD18" = "degree-days above 18°C, cooling degree-days",
-    "NFFD" = "the number of frost-free days",
-    "FFP" = "frost-free period",
-    "bFFP" = "Day of the year on which the Frost-Free Period begins",
-    "eFFP" = "Day of the year on which the Frost-Free Period ends",
-    "PAS" = "precipitation as snow (mm)",
-    "PET" = "Potential Evapotranspiration",
-    "EMT" = "extreme minimum temperature over 30 years (°C)",
-    "EXT" = "extreme maximum temperature over 30 years (°C)",
-    "CMD" = "Hargreaves climatic moisture deficit (mm)",
-    "CMI" = "Hogg’s climate moisture index (mm)",
-    "DD1040" = "degree-days above 10°C and below 40°C",
-    "Eref" = "Hargreaves reference evaporation (mm)",
-    "RH" = "mean relative humidity (%)",
-    "elev" = "North America Elevation CEC 2023",
-    "lat" = "Latitude WSG 84"
-  )
   nm <- fcontent$name
   lbl <- basename(nm) |> tools::file_path_sans_ext()
   season_idx <- grep(paste0("_", names(seasons), "$", collapse = "|"), lbl)
@@ -107,16 +71,16 @@ labelf <- function(fcontent) {
           lbl[monthly_idx],
           paste0("_?", names(months), "$", collapse = "|")
         ) |> unlist()
-        climatevars[s1]
+        label_climatevars[s1]
       },
       {
         s1 <- strsplit(
           lbl[season_idx],
           paste0("_", names(seasons), "$", collapse = "|")
         ) |> unlist()
-        climatevars[s1]
+        label_climatevars[s1]
       },
-      climatevars[lbl[annual_idx]]
+      label_climatevars[lbl[annual_idx]]
     ),
     element = c(
       strsplit(
@@ -143,6 +107,43 @@ labelf <- function(fcontent) {
   data.table::set(resp, j = "label", value = resp[, "(%s) %s" |> sprintf(element, label)])
   return(resp)
 }
+
+label_climatevars <- c(
+  "Tave" = "mean temperatures (°C)",
+  "Tmax" = "maximum mean temperatures (°C)",
+  "Tmin" = "minimum mean temperatures (°C)",
+  "PPT" = "precipitation (mm)",
+  "Rad" = "solar radiation (MJ m-2 d-1)",
+  "MAT" = "mean annual temperature (°C)",
+  "MWMT" = "mean warmest month temperature (°C)",
+  "MCMT" = "mean coldest month temperature (°C)",
+  "TD" = "temperature difference between MWMT and MCMT, or continentality (°C)",
+  "MAP" = "mean annual precipitation (mm)",
+  "MSP" = "mean annual summer (May to Sept.) precipitation (mm)",
+  "AHM" = "annual heat-moisture index (MAT+10)/(MAP/1000))",
+  "SHM" = "summer heat-moisture index ((MWMT)/(MSP/1000))",
+  "DD_0" = "degree-days below 0°C, chilling degree-days",
+  "DDsub0" = "degree-days below 0°C, chilling degree-days",
+  "DD5" = "degree-days above 5°C, growing degree-days",
+  "DD_18" = "degree-days below 18°C, heating degree-days",
+  "DDsub18" = "degree-days below 18°C, heating degree-days",
+  "DD18" = "degree-days above 18°C, cooling degree-days",
+  "NFFD" = "the number of frost-free days",
+  "FFP" = "frost-free period",
+  "bFFP" = "Day of the year on which the Frost-Free Period begins",
+  "eFFP" = "Day of the year on which the Frost-Free Period ends",
+  "PAS" = "precipitation as snow (mm)",
+  "PET" = "Potential Evapotranspiration",
+  "EMT" = "extreme minimum temperature over 30 years (°C)",
+  "EXT" = "extreme maximum temperature over 30 years (°C)",
+  "CMD" = "Hargreaves climatic moisture deficit (mm)",
+  "CMI" = "Hogg’s climate moisture index (mm)",
+  "DD1040" = "degree-days above 10°C and below 40°C",
+  "Eref" = "Hargreaves reference evaporation (mm)",
+  "RH" = "mean relative humidity (%)",
+  "elev" = "North America Elevation CEC 2023",
+  "lat" = "Latitude WSG 84"
+)
 
 time_labels_season <- c(
   "Annual" = "",
@@ -442,3 +443,18 @@ create_points_dt <- function(sg, cec, resolution) {
   }
   return(out_dt)
 }
+
+downscale_core_vars <- sort(sprintf(c("PPT_%02d", "Tmax_%02d", "Tmin_%02d"), sort(rep(1:12, 3))))
+downscale_extra_vars <- local({
+  lbl <- setdiff(climr::list_vars(), downscale_core_vars)
+  seasons <- c("wt" = "Winter", "sp" = "Spring", "sm" = "Summer", "at" = "Autumn")
+  months <- setNames(month.name, sprintf("%02d", 1:12))
+  season_idx <- grep(paste0("_", names(seasons), "$", collapse = "|"), lbl)
+  monthly_idx <- grep(paste0("_?", names(months), "$", collapse = "|"), lbl)
+  annual_idx <- setdiff(seq_along(lbl), c(season_idx, monthly_idx))
+  list(
+    "Monthly" = lbl[monthly_idx],
+    "Seasonal" = lbl[season_idx],
+    "Annual" = lbl[annual_idx]
+  )
+})

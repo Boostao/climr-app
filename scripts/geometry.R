@@ -186,7 +186,6 @@ session_geometry <- function() {
       click_ignore_next <<- TRUE
     },
     add_file = function(f) {
-
       f <- as.list(f)
       f0 <- f$datapath
       d0 <- dirname(f$datapath)
@@ -210,17 +209,42 @@ session_geometry <- function() {
         }
 
         nm <- names(res)
-        id_j <- head(grep("^id|id$|^site", nm, ignore.case = TRUE), 1)
+        geom_j <- head(grep("^geom|geometry", nm, ignore.case = TRUE), 1)        ele_j <- head(grep("^elev|elevation", nm, ignore.case = TRUE), 1)
         lat_j <- head(grep("^lat|latitude", nm, ignore.case = TRUE), 1)
         lng_j <- head(grep("^lng|^long|^lon|longitude", nm, ignore.case = TRUE), 1)
-        ele_j <- head(grep("^elev|elevation", nm, ignore.case = TRUE), 1)
-        geom_j <- head(grep("^geom|geometry", nm, ignore.case = TRUE), 1)
-        
-        if (length(lat_j) && length(lng_j)) {
+        id_j <- head(grep("^id|id$|^site", nm, ignore.case = TRUE), 1)
+
+        if (length(geom_j)) {
+
+          shape <- try(terra::vect(res[[geom_j]] |> terra::aggregate(), crs = "EPSG:4326"), silent = TRUE)
+          if (inherits(res, "try-error")) {
+            report_msg("Unable to read input file geometry column. [pos: %s]" |> sprintf(geom_j), "danger")
+            unlink(d0, recursive = TRUE)
+            return()
+          }
+
+          # Add to file geometries
+          fg[[d0]] <<- list(
+            "datapath" = f0,
+            "type" = "text",
+            "id_j" = id_j,
+            "geom_j" = geom_j,
+            "ele_j" = ele_j,
+            "object" = res
+          )
+
+          new_p <- terra::geom(shape, wkt = TRUE)
+          if (terra::is.points(shape)) {
+            push(new_p, "marker", "file_upload")
+          } else {
+            push(new_p, "shape", "file_upload")
+          }
+
+          return()
+
+        } else if (length(lat_j) && length(lng_j)) {
           report_msg("Found columns in file. [%s : %s]" |> sprintf(f$name, paste(nm[id_j], nm[lat_j], nm[lng_j], nm[ele_j], sep = ", ")))
-        } else if (length(geom_j)) {
-          
-        } else {
+        }} else {
           report_msg("Column detection could not find latitude and longitude pair in file. [%s]" |> sprintf(f$name), "danger")
           return()
         }
@@ -229,11 +253,11 @@ session_geometry <- function() {
         fg[[d0]] <<- list(
           "datapath" = f0,
           "type" = "text",
-          "object" = res,
           "id_j" = id_j,
           "lat_j" = lat_j,
           "lng_j" = lng_j,
-          "ele_j" = ele_j
+          "ele_j" = ele_j,
+          "object" = res
         )
 
         new_p <- "MULTIPOINT (%s)" |> sprintf(paste(sprintf("(%s %s)", res[lng_j], res[lat_j]), collapse = ","))
@@ -287,92 +311,86 @@ session_geometry <- function() {
     },
     process = function() {
       vstore[["processing"]] <- TRUE
-      shiny::removeModal()
       shiny::updateActionButton(inputId = "downscale_process", disabled = TRUE)
       withCallingHandlers(
         message = function(m) {shiny::showNotification(ui = shiny::span(conditionMessage(m)), type = "message")},
         warning = function(w) {shiny::showNotification(ui = shiny::span(conditionMessage(w)), type = "warning")},
-      #   tryCatch(
-          {
-            
-            # Generate run_id once
-            run_id <- generate_run_id()
-            xyz <- create_points_dt(sg, cec, vstore[["downscale_resolution"]])
-            n <- \(x) if (length(x) && !"NULL" %in% x) x
+        error = function(e) {shiny::showNotification(ui = shiny::span(conditionMessage(e)), type = "error")},
+        {
 
-            if (shiny::in_devmode()) {
-              saveRDS(
-                list(
-                  xyz = xyz,
-                  which_refmap = vstore[["downscale_which_refmap"]],
-                  obs_periods = vstore[["downscale_obs_periods"]] |> n(),
-                  obs_years  = vstore[["downscale_obs_years"]] |> n(),
-                  obs_ts_dataset = vstore[["downscale_obs_ts_dataset"]] |> n(),
-                  gcms = vstore[["downscale_gcms"]] |> n(),
-                  ssps = vstore[["downscale_ssps"]] |> n(),
-                  gcm_periods = vstore[["downscale_gcm_periods"]] |> n(),
-                  gcm_ssp_years = vstore[["downscale_gcm_ssp_years"]] |> n(),
-                  gcm_hist_years = vstore[["downscale_gcm_hist_years"]] |> n(),
-                  max_run = vstore[["downscale_max_run"]] |> n() |> as.integer(),
-                  run_nm = vstore[["downscale_run_nm"]] |> n(),
-                  vars = vstore[["downscale_core_vars"]] |> n(),
-                  ppt_lr = vstore[["downscale_core_ppt_lr"]],
-                  hull = attr(xyz, "hull")
-                ),
-                "../run_%s.rds" |> sprintf(run_id)
-              )
-            }
+     
+          # Generate run_id once
+          run_id <- generate_run_id()
+          xyz <- create_points_dt(sg, cec, vstore[["downscale_resolution"]])
+          n <- \(x) if (length(x) && !"NULL" %in% x) x
 
-            res <- climr::downscale_db(
-              xyz = xyz,
-              which_refmap = vstore[["downscale_which_refmap"]],
-              obs_periods = vstore[["downscale_obs_periods"]] |> n(),
-              obs_years  = vstore[["downscale_obs_years"]] |> n(),
-              obs_ts_dataset = vstore[["downscale_obs_ts_dataset"]] |> n(),
-              gcms = vstore[["downscale_gcms"]] |> n(),
-              ssps = vstore[["downscale_ssps"]] |> n(),
-              gcm_periods = vstore[["downscale_gcm_periods"]] |> n(),
-              gcm_ssp_years = vstore[["downscale_gcm_ssp_years"]] |> n(),
-              gcm_hist_years = vstore[["downscale_gcm_hist_years"]] |> n(),
-              max_run = vstore[["downscale_max_run"]] |> n() |> as.integer(),
-              run_nm = vstore[["downscale_run_nm"]] |> n(),
-              vars = vstore[["downscale_core_vars"]] |> n(),
-              ppt_lr = vstore[["downscale_core_ppt_lr"]]
+          if (shiny::in_devmode()) {
+            saveRDS(
+              list(
+                xyz = xyz,
+                which_refmap = vstore[["downscale_which_refmap"]],
+                obs_periods = vstore[["downscale_obs_periods"]] |> n(),
+                obs_years  = vstore[["downscale_obs_years"]] |> n(),
+                obs_ts_dataset = vstore[["downscale_obs_ts_dataset"]] |> n(),
+                gcms = vstore[["downscale_gcms"]] |> n(),
+                ssps = vstore[["downscale_ssps"]] |> n(),
+                gcm_periods = vstore[["downscale_gcm_periods"]] |> n(),
+                gcm_ssp_years = vstore[["downscale_gcm_ssp_years"]] |> n(),
+                gcm_hist_years = vstore[["downscale_gcm_hist_years"]] |> n(),
+                max_run = vstore[["downscale_max_run"]] |> n() |> as.integer(),
+                run_nm = vstore[["downscale_run_nm"]] |> n(),
+                vars = c(downscale_core_vars, vstore[["downscale_extra_vars"]] |> n()),
+                ppt_lr = vstore[["downscale_core_ppt_lr"]],
+                hull = attr(xyz, "hull")
+              ),
+              "../run_%s.rds" |> sprintf(run_id)
             )
-
-            output$downscale_download <- shiny::downloadHandler(
-              filename = function() {
-                paste0("downscale_", run_id, ".zip")
-              },
-              content = function(file) {
-                # Create temporary directory
-                temp_dir <- tempdir()
-                
-                # Write the current res to CSV using the same run_id
-                csv_file <- file.path(temp_dir, paste0("downscale_", run_id, ".csv"))
-                data.table::fwrite(res, csv_file, row.names = FALSE)
-                
-                # List of files to zip
-                files_to_zip <- csv_file
-                
-                # Create ZIP file
-                zip::zipr(file, files_to_zip)
-              },
-              contentType = "application/zip"
-            )
-
-            session$sendCustomMessage(type="jsCode", list(code = "$('.input-control-body a.shiny-download-link').addClass('btn-success');"))
-            shiny::showNotification("Downscale process completed. You can now download the results.", type = "message")
-            vstore[["processing"]] <- FALSE
-            shiny::updateActionButton(inputId = "downscale_process", disabled = FALSE)
-      #     },
-      #     error = function(e) {
-      #       vstore[["processing"]] <- FALSE
-      #       shiny::updateActionButton(inputId = "downscale_process", disabled = FALSE)
-      #       report_msg("%s: %s" |> sprintf(conditionCall(e) |> as.character(), conditionMessage(e)), type = "danger")
           }
-      #   )
+
+          res <- climr::downscale_db(
+            xyz = xyz,
+            which_refmap = vstore[["downscale_which_refmap"]],
+            obs_periods = vstore[["downscale_obs_periods"]] |> n(),
+            obs_years  = vstore[["downscale_obs_years"]] |> n(),
+            obs_ts_dataset = vstore[["downscale_obs_ts_dataset"]] |> n(),
+            gcms = vstore[["downscale_gcms"]] |> n(),
+            ssps = vstore[["downscale_ssps"]] |> n(),
+            gcm_periods = vstore[["downscale_gcm_periods"]] |> n(),
+            gcm_ssp_years = vstore[["downscale_gcm_ssp_years"]] |> n(),
+            gcm_hist_years = vstore[["downscale_gcm_hist_years"]] |> n(),
+            max_run = vstore[["downscale_max_run"]] |> n() |> as.integer(),
+            run_nm = vstore[["downscale_run_nm"]] |> n(),
+            vars = c(downscale_core_vars, vstore[["downscale_extra_vars"]] |> n()),
+            ppt_lr = vstore[["downscale_core_ppt_lr"]]
+          )
+
+          output$downscale_download <- shiny::downloadHandler(
+            filename = function() {
+              paste0("downscale_", run_id, ".zip")
+            },
+            content = function(file) {
+              # Create temporary directory
+              temp_dir <- tempdir()
+              
+              # Write the current res to CSV using the same run_id
+              csv_file <- file.path(temp_dir, paste0("downscale_", run_id, ".csv"))
+              data.table::fwrite(res, csv_file, row.names = FALSE)
+              
+              # List of files to zip
+              files_to_zip <- csv_file
+              
+              # Create ZIP file
+              zip::zipr(file, files_to_zip)
+            },
+            contentType = "application/zip"
+          )
+
+          session$sendCustomMessage(type="jsCode", list(code = "$('.input-control-body a.shiny-download-link').addClass('btn-success');"))
+          shiny::showNotification("Downscale process completed. You can now download the results.", type = "message")
+        }
       )
+      vstore[["processing"]] <- FALSE
+      shiny::updateActionButton(inputId = "downscale_process", disabled = FALSE)
     },
     get = function() {
       return(sg)
