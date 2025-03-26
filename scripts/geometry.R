@@ -289,10 +289,17 @@ session_geometry <- function() {
           "object" = res
         )
 
-        new_p <- terra::ext(res) |>
-          terra::project(from = terra::crs(res), to = "EPSG:4326") |> 
+        new_p <- terra::ext(res)
+
+        
+        if (!terra::is.lonlat(new_p)) {
+          new_p <- terra::project(new_p, from = terra::crs(res), to = "EPSG:4326")
+        }
+        
+        new_p <- new_p |> 
           terra::vect("EPSG:4326") |>
           terra::geom(wkt = TRUE)
+
         push(new_p, "shape", "file_upload")
         return()
       
@@ -314,10 +321,13 @@ session_geometry <- function() {
           "object" = res
         )
 
-        new_p <- res |>
-          terra::aggregate() |>
-          terra::project(from = terra::crs(res), to = "EPSG:4326") |> 
-          terra::geom(wkt = TRUE)
+        new_p <- res |> terra::aggregate()
+        
+        if (!terra::is.lonlat(new_p)) {
+          new_p <- terra::project(new_p, from = terra::crs(res), to = "EPSG:4326")
+        }
+        
+        new_p <- terra::geom(new_p, wkt = TRUE)
         push(new_p, "shape", "file_upload")
         return()
       
