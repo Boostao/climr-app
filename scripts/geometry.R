@@ -191,7 +191,13 @@ session_geometry <- function() {
       d0 <- dirname(f$datapath)
       # does it need unzipping before continuing processing?
       if (tolower(tools::file_ext(f$name)) %in% c("zip","tar","gz","xz","7z","bz2")) {
-        f0 <- file.path(d0, archive::archive_extract(f0, d0))
+        farch <- try(archive::archive_extract(f0, d0), silent = TRUE)
+        if (inherits(farch, "try-error")) {
+          report_msg("Unable to read archive.", "danger")
+          unlink(d0, recursive = TRUE)
+          return()
+        }
+        f0 <- file.path(d0, farch)
         # check if it's multifile archive (bin for raster, shp for polygons)
         if (length(f0) > 1) {
           f0 <- grep("bin$|shp$", f0, value = TRUE, ignore.case = TRUE) |> head(1)
@@ -209,15 +215,16 @@ session_geometry <- function() {
         }
 
         nm <- names(res)
-        geom_j <- head(grep("^geom|geometry", nm, ignore.case = TRUE), 1)        ele_j <- head(grep("^elev|elevation", nm, ignore.case = TRUE), 1)
+        geom_j <- head(grep("^geom|geometry", nm, ignore.case = TRUE), 1)
+        ele_j <- head(grep("^elev|elevation", nm, ignore.case = TRUE), 1)
         lat_j <- head(grep("^lat|latitude", nm, ignore.case = TRUE), 1)
         lng_j <- head(grep("^lng|^long|^lon|longitude", nm, ignore.case = TRUE), 1)
         id_j <- head(grep("^id|id$|^site", nm, ignore.case = TRUE), 1)
 
         if (length(geom_j)) {
 
-          shape <- try(terra::vect(res[[geom_j]] |> terra::aggregate(), crs = "EPSG:4326"), silent = TRUE)
-          if (inherits(res, "try-error")) {
+          shape <- try(terra::vect(res[[geom_j]], crs = "EPSG:4326") |> terra::aggregate(), silent = TRUE)
+          if (inherits(shape, "try-error")) {
             report_msg("Unable to read input file geometry column. [pos: %s]" |> sprintf(geom_j), "danger")
             unlink(d0, recursive = TRUE)
             return()
@@ -244,7 +251,7 @@ session_geometry <- function() {
 
         } else if (length(lat_j) && length(lng_j)) {
           report_msg("Found columns in file. [%s : %s]" |> sprintf(f$name, paste(nm[id_j], nm[lat_j], nm[lng_j], nm[ele_j], sep = ", ")))
-        }} else {
+        } else {
           report_msg("Column detection could not find latitude and longitude pair in file. [%s]" |> sprintf(f$name), "danger")
           return()
         }
@@ -270,6 +277,11 @@ session_geometry <- function() {
       res <- try(terra::rast(f0), silent = TRUE)
       if (!inherits(res, "try-error")) {
 
+        if ("" %in% terra::crs(res)) {
+          report_msg("Could not determine the CRS of the raster. [%s]" |> sprintf(f$name), "danger")
+          return()
+        }
+
         # Add to file geometries
         fg[[d0]] <<- list(
           "datapath" = f0,
@@ -290,6 +302,11 @@ session_geometry <- function() {
       res <- try(terra::vect(f0), silent = TRUE)
       if (!inherits(res, "try-error")) {
 
+        if ("" %in% terra::crs(res)) {
+          report_msg("Could not determine the CRS of the vector. [%s]" |> sprintf(f$name), "danger")
+          return()
+        }
+
         # Add to file geometries
         fg[[d0]] <<- list(
           "datapath" = f0,
@@ -298,6 +315,7 @@ session_geometry <- function() {
         )
 
         new_p <- res |>
+          terra::aggregate() |>
           terra::project(from = terra::crs(res), to = "EPSG:4326") |> 
           terra::geom(wkt = TRUE)
         push(new_p, "shape", "file_upload")
