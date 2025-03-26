@@ -706,17 +706,17 @@ shiny::shinyApp(
       shiny::showModal(
         shiny::modalDialog(
           title = "Preferences for Downscale Processing", size = "l", easyClose = TRUE, fade = FALSE,
+          # shiny::div(
+          #   title = "csv: all points are returned in csv. tif: Only shapes/rasters are returned as GeoTIFF if selected.",
+          #   shiny::radioButtons(
+          #     inputId = "downscale_output",
+          #     label = "Downscale Output Format",
+          #     choices = c("Comma Separated Value (csv)" = "csv", "Geographic Tag Image File Format (GeoTIFF)" = "tif"),
+          #     inline = TRUE,
+          #     selected = vstore[["downscale_output"]]
+          #   )
+          # ),
           shiny::div(
-            title = "csv: all points are returned in csv. tif: Only shapes/rasters are returned as GeoTIFF if selected.",
-            shiny::radioButtons(
-              inputId = "downscale_output",
-              label = "Downscale Output Format",
-              choices = c("Comma Separated Value (csv)" = "csv", "Geographic Tag Image File Format (GeoTIFF)" = "tif"),
-              inline = TRUE,
-              selected = vstore[["downscale_output"]]
-            )
-          ),
-          div(
             title = "Target resolution for shapes drawn on map or added using file upload. Does not apply to points, raster or csv files.",
             shiny::sliderInput(
               inputId = "downscale_resolution",
@@ -965,5 +965,13 @@ shiny::shinyApp(
       if (shiny::in_devmode()) cat("Event: download_overlay", sep = "\n")
       session$sendCustomMessage(type="jsCode", list(code = "window.location.assign('%s');" |> sprintf(vstore[["climatevar"]])))
     })
+
+    # Cleanup when the app stops
+    shiny::onStop(function() {
+      # Remove all files in the tempdir and the directory itself
+      unlink(tempdir(), recursive = TRUE)
+      message("Temporary folder deleted: ", tempdir())
+    })
+
   }
 )
