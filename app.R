@@ -376,6 +376,8 @@ shiny::shinyApp(
       sg$view(input$sg_view)
     })
 
+    sn <- \(j) setNames(j,j)
+
     # ---- Downscale events
     downscale_modal <- function() {
       shiny::showModal(
@@ -399,7 +401,7 @@ shiny::shinyApp(
               inputId = "downscale_obs_periods",
               label = "Observation periods",
               width = "100%",
-              choices = list("Options" = climr::list_obs_periods(), "Remove all" = c("null" = "NULL")),
+              choices = list("Options" = climr::list_obs_periods() |> sn(), "Remove all" = c("null" = "NULL")),
               selected = vstore[["downscale_obs_periods"]]
             )
           ),
@@ -409,7 +411,7 @@ shiny::shinyApp(
               inputId = "downscale_obs_years",
               label = "Observation years",
               width = "100%",
-              choices = list("Options" = climr::list_obs_years(), "Remove all" = c("null" = "NULL")),
+              choices = list("Options" = climr::list_obs_years() |> sn(), "Remove all" = c("null" = "NULL")),
               multiple = TRUE,
               selected = vstore[["downscale_obs_years"]]
             )
@@ -421,7 +423,7 @@ shiny::shinyApp(
               label = "Observation time-series data",
               width = "100%",
               selected = vstore[["downscale_obs_ts_dataset"]],
-              choices = c("null" = "NULL", "ClimateNA" = "climatena", "Climatic Research Unit / Global Precipitation Climatology Centre" = "cru.gpcc")
+              choices = c("ClimateNA" = "climatena", "Climatic Research Unit / Global Precipitation Climatology Centre" = "cru.gpcc", "null" = "NULL")
             )
           ),
           shiny::div(
@@ -430,7 +432,7 @@ shiny::shinyApp(
               inputId = "downscale_gcms",
               label = "Global climate model",
               width = "100%",
-              choices = list("Options" = climr::list_gcms(), "Remove all" = c("null" = "NULL")),
+              choices = list("Options" = climr::list_gcms() |> sn(), "Remove all" = c("null" = "NULL")),
               multiple = TRUE,
               selected = vstore[["downscale_gcms"]]
             )
@@ -441,7 +443,7 @@ shiny::shinyApp(
               inputId = "downscale_ssps",
               label = "Shared Socio-economic Pathways (SSP) - Representative Concentration Pathways (RCP) Scenarios",
               width = "100%",
-              choices = list("Options" = climr::list_ssps(), "Remove all" = c("null" = "NULL")),
+              choices = list("Options" = climr::list_ssps() |> sn(), "Remove all" = c("null" = "NULL")),
               multiple = TRUE,
               selected = vstore[["downscale_ssps"]]
             )
@@ -452,7 +454,7 @@ shiny::shinyApp(
               inputId = "downscale_gcm_periods",
               label = "General Circulation Model (GCM) Periods",
               width = "100%",
-              choices = list("Options" = climr::list_gcm_periods(), "Remove all" = c("null" = "NULL")),
+              choices = list("Options" = climr::list_gcm_periods() |> sn(), "Remove all" = c("null" = "NULL")),
               multiple = TRUE,
               selected = vstore[["downscale_gcm_periods"]]
             )
@@ -463,7 +465,7 @@ shiny::shinyApp(
               inputId = "downscale_gcm_ssp_years",
               label = "General circulation model (GCM) Shared Socio-economic Pathways (SSP) Years",
               width = "100%",
-              choices = list("Options" = climr::list_gcm_ssp_years(), "Remove all" = c("null" = "NULL")),
+              choices = list("Options" = climr::list_gcm_ssp_years() |> sn(), "Remove all" = c("null" = "NULL")),
               multiple = TRUE,
               selected = vstore[["downscale_gcm_ssp_years"]]
             )
@@ -474,7 +476,7 @@ shiny::shinyApp(
               inputId = "downscale_gcm_hist_years",
               label = "General circulation model (GCM) Historical Years",
               width = "100%",
-              choices = list("Options" = climr::list_gcm_hist_years(), "Remove all" = c("null" = "NULL")),
+              choices = list("Options" = climr::list_gcm_hist_years() |> sn(), "Remove all" = c("null" = "NULL")),
               multiple = TRUE,
               selected = vstore[["downscale_gcm_hist_years"]]
             )
@@ -502,9 +504,9 @@ shiny::shinyApp(
                 if (!length(gcms) && !length(ssps)) {
                   c()
                 } else if (length(gcms) && !length(ssps)) {
-                  climr::list_runs_historic(gcm = gcms)
+                  climr::list_runs_historic(gcm = gcms) |> sn()
                 } else if (length(gcms) && length(ssps)) {
-                  climr::list_runs_ssp(gcm = gcms, ssp = ssps)
+                  climr::list_runs_ssp(gcm = gcms, ssp = ssps) |> sn()
                 }
               }, "Remove all" = c("null" = "NULL")),
               multiple = TRUE,
@@ -668,9 +670,9 @@ shiny::shinyApp(
       if (!length(gcms) && !length(ssps)) {
         opt_choices <- c()
       } else if (length(gcms) && !length(ssps)) {
-        opt_choices <- climr::list_runs_historic(gcm = gcms)
+        opt_choices <- climr::list_runs_historic(gcm = gcms) |> sn()
       } else if (length(gcms) && length(ssps)) {
-        opt_choices <- climr::list_runs_ssp(gcm = gcms, ssp = ssps)
+        opt_choices <- climr::list_runs_ssp(gcm = gcms, ssp = ssps) |> sn()
       }
       choices <- list("Options" = opt_choices, "Remove all" = c("null" = "NULL"))
       if (all(vstore[["downscale_run_nm"]] %in% unlist(choices))) {
