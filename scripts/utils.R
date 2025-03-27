@@ -432,9 +432,13 @@ process_downscale <- function(sg, cec, vstore, fg, run_id) {
       xyz <- fg[[sg[["datapath"]][i]]]$raster
       res <- ds(xyz)
       # Write the current res to tif using the same run_id
-      tif_file <- file.path(temp_dir, paste0("downscale_", run_id, "_raster_",i,".tif"))
-      terra::writeRaster(x = res, filename = tif_file, gdal=c("PREDICTOR=2"), datatype="FLT4S", overwrite = TRUE)
-      output_files <- c(output_files, tif_file)
+      out_file <- file.path(temp_dir, paste0("downscale_", run_id, "_raster_",i,".%s" |> sprintf(vstore[["downscale_output"]])))
+      if (vstore[["downscale_output"]] %in% "tif") {
+        terra::writeRaster(x = res, filename = out_file, gdal=c("PREDICTOR=2"), datatype="FLT4S", overwrite = TRUE)
+      } else {
+        data.table::as.data.table(res) |> data.table::fwrite(file = out_file, row.names = TRUE)
+      }      
+      output_files <- c(output_files, out_file)
       rm(xyz, res)
     }
   }
@@ -461,9 +465,13 @@ process_downscale <- function(sg, cec, vstore, fg, run_id) {
       res <- ds(xyz)
       res <- terra::mask(res, g)
       # Write the current res to tif using the same run_id
-      tif_file <- file.path(temp_dir, paste0("downscale_", run_id, "_map_draw_",i,".tif"))
-      terra::writeRaster(x = res, filename = tif_file, gdal=c("PREDICTOR=2"), datatype="FLT4S", overwrite = TRUE)
-      output_files <- c(output_files, tif_file)
+      out_file <- file.path(temp_dir, paste0("downscale_", run_id, "_map_draw_",i,".%s" |> sprintf(vstore[["downscale_output"]])))
+      if (vstore[["downscale_output"]] %in% "tif") {
+        terra::writeRaster(x = res, filename = out_file, gdal=c("PREDICTOR=2"), datatype="FLT4S", overwrite = TRUE)
+      } else {
+        data.table::as.data.table(res) |> data.table::fwrite(file = out_file, row.names = TRUE)
+      }      
+      output_files <- c(output_files, out_file)
       rm(xyz, res, g)
     }
 
@@ -475,9 +483,13 @@ process_downscale <- function(sg, cec, vstore, fg, run_id) {
         res <- ds(xyz)
         res <- terra::mask(res, g)
         # Write the current res to tif using the same run_id
-        tif_file <- file.path(temp_dir, paste0("downscale_", run_id, "_file_upload_", i,"_shape_", j, ".tif"))
-        terra::writeRaster(x = res, filename = tif_file, gdal=c("PREDICTOR=2"), datatype="FLT4S", overwrite = TRUE)
-        output_files <- c(output_files, tif_file)
+        out_file <- file.path(temp_dir, paste0("downscale_", run_id, "_file_upload_", i,"_shape_", j, ".%s" |> sprintf(vstore[["downscale_output"]])))
+        if (vstore[["downscale_output"]] %in% "tif") {
+          terra::writeRaster(x = res, filename = out_file, gdal=c("PREDICTOR=2"), datatype="FLT4S", overwrite = TRUE)
+        } else {
+          data.table::as.data.table(res) |> data.table::fwrite(file = out_file, row.names = TRUE)
+        }      
+        output_files <- c(output_files, out_file)
         rm(xyz, res, g)
       }
     }

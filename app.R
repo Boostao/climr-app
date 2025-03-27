@@ -336,7 +336,7 @@ shiny::shinyApp(
       downscale_run_nm = downscale_default[["downscale_run_nm"]],
       downscale_extra_vars = downscale_default[["downscale_extra_vars"]],
       downscale_core_ppt_lr = downscale_default[["downscale_core_ppt_lr"]],
-      downscale_output = "csv",
+      downscale_output = "tif",
       downscale_resolution = 2500,
       vscale = "none",
       processing = FALSE
@@ -706,16 +706,16 @@ shiny::shinyApp(
       shiny::showModal(
         shiny::modalDialog(
           title = "Preferences for Downscale Processing", size = "l", easyClose = TRUE, fade = FALSE,
-          # shiny::div(
-          #   title = "csv: all points are returned in csv. tif: Only shapes/rasters are returned as GeoTIFF if selected.",
-          #   shiny::radioButtons(
-          #     inputId = "downscale_output",
-          #     label = "Downscale Output Format",
-          #     choices = c("Comma Separated Value (csv)" = "csv", "Geographic Tag Image File Format (GeoTIFF)" = "tif"),
-          #     inline = TRUE,
-          #     selected = vstore[["downscale_output"]]
-          #   )
-          # ),
+          shiny::div(
+            title = "tif: Shapes/rasters are returned as GeoTIFF. csv: all points are returned in csv.",
+            shiny::radioButtons(
+              inputId = "downscale_output",
+              label = "Downscale Output Format Priority",
+              choices = c("Geographic Tag Image File Format (GeoTIFF)" = "tif", "Comma Separated Value (csv)" = "csv"),
+              inline = TRUE,
+              selected = vstore[["downscale_output"]]
+            )
+          ),
           shiny::div(
             title = "Target resolution for shapes drawn on map or added using file upload. Does not apply to points, raster or csv files.",
             shiny::sliderInput(
