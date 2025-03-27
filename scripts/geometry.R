@@ -354,6 +354,14 @@ session_geometry <- function() {
 
           output_files <- process_downscale(sg, cec, vstore, fg, run_id)
 
+          if (!length(output_files)) {
+            vstore[["processing"]] <- FALSE
+            shiny::updateActionButton(inputId = "downscale_process", disabled = FALSE)
+            shiny::removeModal()
+            shiny::showNotification("No output generated.", type = "warning")
+            return()
+          }
+
           output$downscale_download <- shiny::downloadHandler(
             filename = function() {
               paste0("downscale_", run_id, ".zip")
@@ -371,6 +379,7 @@ session_geometry <- function() {
       )
       vstore[["processing"]] <- FALSE
       shiny::updateActionButton(inputId = "downscale_process", disabled = FALSE)
+      shiny::removeModal()
     },
     get = function() {
       return(sg)

@@ -354,48 +354,60 @@ process_downscale <- function(sg, cec, vstore, fg, run_id) {
   if ("marker" %in% sg[["group"]]) {
     # Do non file_upload first
     marker_idx <- which(sg$group == "marker" & sg$source == "map_click")
-    marker_geoms <- terra::vect(sg$wkt[marker_idx], crs = "EPSG:4326")
-    coords <- terra::crds(marker_geoms)
-    elevs <- terra::extract(cec, marker_geoms, method = "bilinear", ID = FALSE, raw = TRUE)[,1]
-    marker_dt <- data.table::data.table(
-      sg_id = sg$id[marker_idx],
-      id = seq_len(marker_idx) + 9999,
-      lon = coords[, 1],
-      lat = coords[, 2],
-      elev = elevs
-    )
+
+    if (length(marker_idx)) {
+      marker_geoms <- terra::vect(sg$wkt[marker_idx], crs = "EPSG:4326")
+      coords <- terra::crds(marker_geoms)
+      elevs <- terra::extract(cec, marker_geoms, method = "bilinear", ID = FALSE, raw = TRUE)[,1]
+      marker_dt <- data.table::data.table(
+        sg_id = sg$id[marker_idx],
+        id = seq_len(length(marker_idx)) + 9999,
+        lon = coords[, 1],
+        lat = coords[, 2],
+        elev = elevs
+      )
+    } else {
+      marker_dt <- data.table::data.table()
+    }
+
     # Do file_upload second
     file_idx <- which(sg$group == "marker" & sg$source == "file_upload")
-    file_dt <- lapply(file_idx, \(i) {
-      
-      curf <- fg[[sg[["datapath"]][i]]]
-      
-      if (length(curf[["id"]])) {
-        f_id <- curf$table[[curf[["id"]]]]
-      } else { 
-        f_id <- seq_len(nrow(curf$table))
-      }
-      
-      if (!is.null(curf$shape)) {
-        coords <- terra::crds(curf$shape)
-        f_lon = coords[, 1]
-        f_lat = coords[, 2]
-      } else {
-        f_lon <- curf$table[[curf[["lon"]]]]
-        f_lat <- curf$table[[curf[["lat"]]]]
-      }
-      
-      if (length(curf[["elev"]])) {
-        f_elev <- curf$table[[curf[["elev"]]]]
-      } else {
-        f_elev <- terra::extract(cec, data.frame(x = f_lon, y = f_lat), method = "bilinear", ID = FALSE, raw = TRUE)[,1]
-      }
 
-      data.table::data.table(sg_id = i, id = f_id, lon = f_lon, lat = f_lat, elev = f_elev)
+    if (length(file_idx)) {
+      file_dt <- lapply(file_idx, \(i) {
+      
+        curf <- fg[[sg[["datapath"]][i]]]
         
-    }) |> data.table::rbindlist(use.names = TRUE, fill = TRUE)
+        if (length(curf[["id"]])) {
+          f_id <- curf$table[[curf[["id"]]]]
+        } else { 
+          f_id <- seq_len(nrow(curf$table))
+        }
+        
+        if (!is.null(curf$shape)) {
+          coords <- terra::crds(curf$shape)
+          f_lon = coords[, 1]
+          f_lat = coords[, 2]
+        } else {
+          f_lon <- curf$table[[curf[["lon"]]]]
+          f_lat <- curf$table[[curf[["lat"]]]]
+        }
+        
+        if (length(curf[["elev"]])) {
+          f_elev <- curf$table[[curf[["elev"]]]]
+        } else {
+          f_elev <- terra::extract(cec, data.frame(x = f_lon, y = f_lat), method = "bilinear", ID = FALSE, raw = TRUE)[,1]
+        }
+  
+        data.table::data.table(sg_id = i, id = f_id, lon = f_lon, lat = f_lat, elev = f_elev)
+          
+      }) |> data.table::rbindlist(use.names = TRUE, fill = TRUE)
 
-    xyz <- data.table::rbindlist(list(marker_dt, file_dt))
+    } else {
+      file_dt <- data.table::data.table()
+    }
+
+    xyz <- data.table::rbindlist(list(marker_dt, file_dt), use.names = TRUE, fill = TRUE)
 
     if (any(duplicated(xyz$id))) {
       warning("Duplicated ids found in points. Replacing.")
@@ -456,7 +468,7 @@ process_downscale <- function(sg, cec, vstore, fg, run_id) {
     }
 
     # Do file upload with loop
-    for (i in map_shape_idx) {
+    for (i in file_upload_idx) {
       for (j in seq_along(fg[[sg[["datapath"]][i]]]$shape)) {
         g <- fg[[sg[["datapath"]][i]]]$shape[j]
         xyz <- g |> rastmaker()
