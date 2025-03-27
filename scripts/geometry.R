@@ -90,15 +90,14 @@ session_geometry <- function() {
   }
 
   modal_map <- function(wkt, g) {
-    m <- leaflet::leaflet() |> leaflet::addProviderTiles(provider = leaflet::providers$CartoDB.PositronNoLabels)
-    if (g == "marker") {
-      m <- m |> leaflet::addAwesomeMarkers(
+    if ("marker" %in% g) {
+      m <- mview |> leaflet::addAwesomeMarkers(
         data = terra::vect(wkt),
         group = "sg_marker",
         icon = default_icon
       )
-    } else if (g == "shape") {
-      m <- m |> leaflet::addPolygons(
+    } else if ("shape" %in% g ) {
+      m <- mview |> leaflet::addPolygons(
         data = terra::vect(wkt),
         fillColor = "#fcba19",
         color = "#036",
@@ -193,7 +192,7 @@ session_geometry <- function() {
       if (tolower(tools::file_ext(f$name)) %in% c("zip","tar","gz","xz","7z","bz2")) {
         farch <- try(archive::archive_extract(f0, d0), silent = TRUE)
         if (inherits(farch, "try-error")) {
-          report_msg("Unable to read archive.", "danger")
+          shiny::showNotification("Unable to read archive.", type = "error")
           unlink(d0, recursive = TRUE)
           return()
         }
@@ -209,23 +208,25 @@ session_geometry <- function() {
 
         res <- try(data.table::fread(f0), silent = TRUE)
         if (inherits(res, "try-error")) {
-          report_msg("Unable to read input file (csv/txt). [data.table::fread(\"%s\")]" |> sprintf(f$name), "danger")
+          shiny::showNotification("Unable to read input file (csv/txt). [data.table::fread(\"%s\")]" |> sprintf(f$name), type = "error")
           unlink(d0, recursive = TRUE)
           return()
         }
 
         nm <- names(res)
         geom_j <- head(grep("^geom|geometry", nm, ignore.case = TRUE), 1)
-        ele_j <- head(grep("^elev|elevation", nm, ignore.case = TRUE), 1)
+        elev_j <- head(grep("^elev|elevation", nm, ignore.case = TRUE), 1)
+        lon_j <- head(grep("^lng|^long|^lon|longitude", nm, ignore.case = TRUE), 1)
         lat_j <- head(grep("^lat|latitude", nm, ignore.case = TRUE), 1)
-        lng_j <- head(grep("^lng|^long|^lon|longitude", nm, ignore.case = TRUE), 1)
         id_j <- head(grep("^id|id$|^site", nm, ignore.case = TRUE), 1)
 
         if (length(geom_j)) {
 
-          shape <- try(terra::vect(res[[geom_j]], crs = "EPSG:4326") |> terra::aggregate(), silent = TRUE)
+          shiny::showNotification("Found columns in file. [%s : %s]" |> sprintf(f$name, paste(nm[id_j], nm[geom_j], sep = ", ")), type = "message")
+
+          shape <- try(terra::vect(res[[geom_j]], crs = "EPSG:4326"), silent = TRUE)
           if (inherits(shape, "try-error")) {
-            report_msg("Unable to read input file geometry column. [pos: %s]" |> sprintf(geom_j), "danger")
+            shiny::showNotification("Unable to read input file geometry column. [pos: %s]" |> sprintf(geom_j), type = "error")
             unlink(d0, recursive = TRUE)
             return()
           }
@@ -234,25 +235,29 @@ session_geometry <- function() {
           fg[[d0]] <<- list(
             "datapath" = f0,
             "type" = "text",
-            "id_j" = id_j,
-            "geom_j" = geom_j,
-            "ele_j" = ele_j,
-            "object" = res
+            "id" = id_j,
+            "geom" = geom_j,
+            "elev" = elev_j,
+            "table" = res[,-geom_j],
+            "shape" = shape
           )
 
-          new_p <- terra::geom(shape, wkt = TRUE)
+          new_p <- shape |>
+            terra::aggregate() |>
+            terra::geom(wkt = TRUE)
+
           if (terra::is.points(shape)) {
-            push(new_p, "marker", "file_upload")
+            push(new_p, "marker", "file_upload", d0)
           } else {
-            push(new_p, "shape", "file_upload")
+            push(new_p, "shape", "file_upload", d0)
           }
 
           return()
 
-        } else if (length(lat_j) && length(lng_j)) {
-          report_msg("Found columns in file. [%s : %s]" |> sprintf(f$name, paste(nm[id_j], nm[lat_j], nm[lng_j], nm[ele_j], sep = ", ")))
+        } else if (length(lat_j) && length(lon_j)) {
+          shiny::showNotification("Found columns in file. [%s : %s]" |> sprintf(f$name, paste(nm[id_j], nm[lat_j], nm[lon_j], nm[elev_j], sep = ", ")), type = "message")
         } else {
-          report_msg("Column detection could not find latitude and longitude pair in file. [%s]" |> sprintf(f$name), "danger")
+          shiny::showNotification("Column detection could not find latitude and longitude pair in file. [%s]" |> sprintf(f$name), type = "error")
           return()
         }
 
@@ -260,15 +265,15 @@ session_geometry <- function() {
         fg[[d0]] <<- list(
           "datapath" = f0,
           "type" = "text",
-          "id_j" = id_j,
-          "lat_j" = lat_j,
-          "lng_j" = lng_j,
-          "ele_j" = ele_j,
-          "object" = res
+          "id" = id_j,
+          "lon" = lon_j,
+          "lat" = lat_j,
+          "elev" = elev_j,
+          "table" = res
         )
 
-        new_p <- "MULTIPOINT (%s)" |> sprintf(paste(sprintf("(%s %s)", res[lng_j], res[lat_j]), collapse = ","))
-        push(new_p, "marker", "file_upload")
+        new_p <- "MULTIPOINT (%s)" |> sprintf(paste(sprintf("(%s %s)", res[[lon_j]], res[[lat_j]]), collapse = ","))
+        push(new_p, "marker", "file_upload", d0)
         return()
 
       }
@@ -278,29 +283,27 @@ session_geometry <- function() {
       if (!inherits(res, "try-error")) {
 
         if ("" %in% terra::crs(res)) {
-          report_msg("Could not determine the CRS of the raster. [%s]" |> sprintf(f$name), "danger")
+          shiny::showNotification("Could not determine the CRS of the raster. [%s]" |> sprintf(f$name), type = "error")
           return()
+        }
+
+        if (!terra::is.lonlat(res)) {
+          res <- terra::project(res, from = terra::crs(res), to = "EPSG:4326")
         }
 
         # Add to file geometries
         fg[[d0]] <<- list(
           "datapath" = f0,
           "type" = "raster",
-          "object" = res
+          "raster" = res
         )
-
-        new_p <- terra::ext(res)
-
         
-        if (!terra::is.lonlat(new_p)) {
-          new_p <- terra::project(new_p, from = terra::crs(res), to = "EPSG:4326")
-        }
-        
-        new_p <- new_p |> 
-          terra::vect("EPSG:4326") |>
+        new_p <- res |> 
+          terra::ext() |>
+          terra::vect() |>
           terra::geom(wkt = TRUE)
 
-        push(new_p, "shape", "file_upload")
+        push(new_p, "shape", "raster_upload", d0)
         return()
       
       }
@@ -310,30 +313,31 @@ session_geometry <- function() {
       if (!inherits(res, "try-error")) {
 
         if ("" %in% terra::crs(res)) {
-          report_msg("Could not determine the CRS of the vector. [%s]" |> sprintf(f$name), "danger")
+          shiny::showNotification("Could not determine the CRS of the vector. [%s]" |> sprintf(f$name), type = "error")
           return()
+        }
+
+        if (!terra::is.lonlat(res)) {
+          res <- terra::project(res, from = terra::crs(res), to = "EPSG:4326")
         }
 
         # Add to file geometries
         fg[[d0]] <<- list(
           "datapath" = f0,
           "type" = "shape",
-          "object" = res
+          "shape" = res
         )
 
-        new_p <- res |> terra::aggregate()
-        
-        if (!terra::is.lonlat(new_p)) {
-          new_p <- terra::project(new_p, from = terra::crs(res), to = "EPSG:4326")
-        }
-        
-        new_p <- terra::geom(new_p, wkt = TRUE)
-        push(new_p, "shape", "file_upload")
+        new_p <- res |>
+          terra::aggregate() |>
+          terra::geom(wkt = TRUE)
+
+        push(new_p, "shape", "file_upload", d0)
         return()
       
       }
       
-      report_msg("Unable to ingest uploaded file. [%s]" |> sprintf(f$name), "danger")
+      shiny::showNotification("Unable to ingest uploaded file. [%s]" |> sprintf(f$name), type = "error")
       return()
 
     },
@@ -346,69 +350,17 @@ session_geometry <- function() {
         error = function(e) {shiny::showNotification(ui = shiny::span(conditionMessage(e)), type = "error")},
         {
 
-     
-          # Generate run_id once
           run_id <- generate_run_id()
-          xyz <- create_points_dt(sg, cec, vstore[["downscale_resolution"]])
-          n <- \(x) if (length(x) && !"NULL" %in% x) x
 
-          if (shiny::in_devmode()) {
-            saveRDS(
-              list(
-                xyz = xyz,
-                which_refmap = vstore[["downscale_which_refmap"]],
-                obs_periods = vstore[["downscale_obs_periods"]] |> n(),
-                obs_years  = vstore[["downscale_obs_years"]] |> n(),
-                obs_ts_dataset = vstore[["downscale_obs_ts_dataset"]] |> n(),
-                gcms = vstore[["downscale_gcms"]] |> n(),
-                ssps = vstore[["downscale_ssps"]] |> n(),
-                gcm_periods = vstore[["downscale_gcm_periods"]] |> n(),
-                gcm_ssp_years = vstore[["downscale_gcm_ssp_years"]] |> n(),
-                gcm_hist_years = vstore[["downscale_gcm_hist_years"]] |> n(),
-                max_run = vstore[["downscale_max_run"]] |> n() |> as.integer(),
-                run_nm = vstore[["downscale_run_nm"]] |> n(),
-                vars = c(downscale_core_vars, vstore[["downscale_extra_vars"]] |> n()),
-                ppt_lr = vstore[["downscale_core_ppt_lr"]],
-                hull = attr(xyz, "hull")
-              ),
-              "../run_%s.rds" |> sprintf(run_id)
-            )
-          }
-
-          res <- climr::downscale_db(
-            xyz = xyz,
-            which_refmap = vstore[["downscale_which_refmap"]],
-            obs_periods = vstore[["downscale_obs_periods"]] |> n(),
-            obs_years  = vstore[["downscale_obs_years"]] |> n(),
-            obs_ts_dataset = vstore[["downscale_obs_ts_dataset"]] |> n(),
-            gcms = vstore[["downscale_gcms"]] |> n(),
-            ssps = vstore[["downscale_ssps"]] |> n(),
-            gcm_periods = vstore[["downscale_gcm_periods"]] |> n(),
-            gcm_ssp_years = vstore[["downscale_gcm_ssp_years"]] |> n(),
-            gcm_hist_years = vstore[["downscale_gcm_hist_years"]] |> n(),
-            max_run = vstore[["downscale_max_run"]] |> n() |> as.integer(),
-            run_nm = vstore[["downscale_run_nm"]] |> n(),
-            vars = c(downscale_core_vars, vstore[["downscale_extra_vars"]] |> n()),
-            ppt_lr = vstore[["downscale_core_ppt_lr"]]
-          )
+          output_files <- process_downscale(sg, cec, vstore, fg, run_id)
 
           output$downscale_download <- shiny::downloadHandler(
             filename = function() {
               paste0("downscale_", run_id, ".zip")
             },
-            content = function(file) {
-              # Create temporary directory
-              temp_dir <- tempdir()
-              
-              # Write the current res to CSV using the same run_id
-              csv_file <- file.path(temp_dir, paste0("downscale_", run_id, ".csv"))
-              data.table::fwrite(res, csv_file, row.names = FALSE)
-              
-              # List of files to zip
-              files_to_zip <- csv_file
-              
-              # Create ZIP file
-              zip::zipr(file, files_to_zip)
+            content = function(file) {            
+              on.exit(unlink(output_files), add = TRUE)
+              zip::zipr(file, output_files)
             },
             contentType = "application/zip"
           )

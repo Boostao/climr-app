@@ -306,39 +306,7 @@ default_draw_tool <- function(mp) {
 }
 
 default_icon <- leaflet::makeAwesomeIcon("record", markerColor = "darkblue", iconColor = "#fcba19")
-
-report_msg <- function(msgs, type = c("info", "danger")) {
-
-  type <- match.arg(type)
-
-  hd <- c(
-    "info" = "Climr info:",
-    "danger" = "Climr encountered problems:"
-  )
-
-  if (!shiny::devmode() & type %in% "danger") {
-    msgs <- "Error with climr: file issue at http://www.github.com/bcgov/climr-app"
-  }
-
-  msgs_html <- tags$div(
-    class = "alert alert-%s" |> sprintf(type),
-    tags$h4(class = "alert-heading", hd[type]),
-    tags$ul(
-      lapply(msgs, function(msg) {
-        tags$li(msg)
-      })
-    )
-  )  
-  # Show modal with problems
-  shiny::showModal(
-    shiny::modalDialog(
-      msgs_html,
-      size = "xl",
-      fade = FALSE,
-      easyClose = TRUE
-  ))
-
-}
+mview <- leaflet::leaflet() |> leaflet::addProviderTiles(provider = leaflet::providers$CartoDB.PositronNoLabels)
 
 # Function to generate random run number with compressed timestamp
 generate_run_id <- function() {
@@ -355,93 +323,157 @@ generate_run_id <- function() {
 # Albers Equal Area CRS (meters-based)
 albers_crs <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m"
 
-create_points_dt <- function(sg, cec, resolution) {
+process_downscale <- function(sg, cec, vstore, fg, run_id) {
 
-  # Initialize output data.table
-  out_dt <- data.table(sg_id = integer(), id = integer(), lon = numeric(), lat = numeric(), elev = numeric())
+  output_files <- c()
+  n <- \(x) if (length(x) && !"NULL" %in% x) x
+  # Create temporary directory
+  temp_dir <- tempdir()
 
-  # Split indices by group
-  marker_idx <- which(sg$group == "marker")
-  shape_idx <- which(sg$group == "shape")
-  hull <- NULL
+  # Downscale call
+  ds <- \(xyz) {
+    climr::downscale(
+      xyz = xyz,
+      which_refmap = vstore[["downscale_which_refmap"]],
+      obs_periods = vstore[["downscale_obs_periods"]] |> n(),
+      obs_years  = vstore[["downscale_obs_years"]] |> n(),
+      obs_ts_dataset = vstore[["downscale_obs_ts_dataset"]] |> n(),
+      gcms = vstore[["downscale_gcms"]] |> n(),
+      ssps = vstore[["downscale_ssps"]] |> n(),
+      gcm_periods = vstore[["downscale_gcm_periods"]] |> n(),
+      gcm_ssp_years = vstore[["downscale_gcm_ssp_years"]] |> n(),
+      gcm_hist_years = vstore[["downscale_gcm_hist_years"]] |> n(),
+      max_run = vstore[["downscale_max_run"]] |> n() |> as.integer(),
+      run_nm = vstore[["downscale_run_nm"]] |> n(),
+      vars = c(downscale_core_vars, vstore[["downscale_extra_vars"]] |> n()),
+      ppt_lr = vstore[["downscale_core_ppt_lr"]]
+    )
+  }
   
-  # Process markers
-  if (length(marker_idx) > 0) {
+  # Process all loose points first
+  if ("marker" %in% sg[["group"]]) {
+    # Do non file_upload first
+    marker_idx <- which(sg$group == "marker" & sg$source == "map_click")
     marker_geoms <- terra::vect(sg$wkt[marker_idx], crs = "EPSG:4326")
     coords <- terra::crds(marker_geoms)
     elevs <- terra::extract(cec, marker_geoms, method = "bilinear", ID = FALSE, raw = TRUE)[,1]
-    
-    marker_dt <- data.table(
+    marker_dt <- data.table::data.table(
       sg_id = sg$id[marker_idx],
-      id = 1,
+      id = seq_len(marker_idx) + 9999,
       lon = coords[, 1],
       lat = coords[, 2],
       elev = elevs
     )
-    hull <- terra::convHull(marker_geoms)
-  } else {
-    marker_dt <- data.table::data.table()
-  }
-  
-  # Process shapes
-  if (length(shape_idx) > 0) {
-    shape_geoms <- terra::vect(sg$wkt[shape_idx], crs = "EPSG:4326")
-    shape_geoms_albers <- terra::project(shape_geoms, albers_crs)
-    
-    # Generate grid for each shape in Albers (meters)
-    grid_list <- lapply(seq_along(shape_idx), function(i) {
-      extents_albers <- terra::ext(shape_geoms_albers[i])
-      xmin <- extents_albers$xmin
-      xmax <- extents_albers$xmax
-      ymin <- extents_albers$ymin
-      ymax <- extents_albers$ymax
-      x_seq <- seq(xmin, xmax, by = c(1,-1)[(xmax < xmin) + 1] * resolution)
-      y_seq <- seq(ymin, ymax, by = c(1,-1)[(ymax < ymin) + 1] * resolution)
-      grid_dt <- expand.grid(x = x_seq, y = y_seq)
-      # Convert to SpatVector in Albers
-      grid_vect_albers <- terra::vect(as.matrix(grid_dt[, c("x", "y")]), crs = albers_crs)
-      # Check which points are within their respective polygons
-      pts_within <- terra::is.related(grid_vect_albers, shape_geoms_albers[i], "within")
-      grid_valid_albers <- grid_vect_albers[which(pts_within)]
-      if (length(grid_valid_albers) > 0) {
-        # Convert back to WGS84 (EPSG:4326)
-        grid_vect_wgs84 <- terra::project(grid_valid_albers, "EPSG:4326")
-        coords_wgs84 <- terra::crds(grid_vect_wgs84)
-        # Extract elevations
-        elevs <- terra::extract(cec, grid_vect_wgs84, method = "bilinear", ID = FALSE, raw = TRUE)[,1]
-        # Create output for shapes
-        shape_dt <- data.table(
-          sg_id = sg$id[shape_idx[i]],
-          id = 1,
-          lon = coords_wgs84[, 1],
-          lat = coords_wgs84[, 2],
-          elev = elevs
-        )
-        return(shape_dt)
+    # Do file_upload second
+    file_idx <- which(sg$group == "marker" & sg$source == "file_upload")
+    file_dt <- lapply(file_idx, \(i) {
+      
+      curf <- fg[[sg[["datapath"]][i]]]
+      
+      if (length(curf[["id"]])) {
+        f_id <- curf$table[[curf[["id"]]]]
+      } else { 
+        f_id <- seq_len(nrow(curf$table))
       }
-      return(data.table::data.table())
-    })
+      
+      if (!is.null(curf$shape)) {
+        coords <- terra::crds(curf$shape)
+        f_lon = coords[, 1]
+        f_lat = coords[, 2]
+      } else {
+        f_lon <- curf$table[[curf[["lon"]]]]
+        f_lat <- curf$table[[curf[["lat"]]]]
+      }
+      
+      if (length(curf[["elev"]])) {
+        f_elev <- curf$table[[curf[["elev"]]]]
+      } else {
+        f_elev <- terra::extract(cec, data.frame(x = f_lon, y = f_lat), method = "bilinear", ID = FALSE, raw = TRUE)[,1]
+      }
 
-    hull <- if (is.null(hull)) {
-      terra::convHull(shape_geoms)
-    } else {
-      if (length(marker_idx) == 1) {
-        hull <- terra::buffer(hull, 0.001, quadsegs = 1, capstyle = "square")
-      }
-      terra::union(hull, terra::convHull(shape_geoms)) |> terra::convHull()
+      data.table::data.table(sg_id = i, id = f_id, lon = f_lon, lat = f_lat, elev = f_elev)
+        
+    }) |> data.table::rbindlist(use.names = TRUE, fill = TRUE)
+
+    xyz <- data.table::rbindlist(list(marker_dt, file_dt))
+
+    if (any(duplicated(xyz$id))) {
+      warning("Duplicated ids found in points. Replacing.")
+      xyz$id <- seq_len(nrow(xyz))
     }
 
-  } else {
-    grid_list <- list(data.table::data.table())
+    res <- ds(xyz)
+    # Write the current res to CSV using the same run_id
+    csv_file <- file.path(temp_dir, paste0("downscale_", run_id, ".csv"))
+    data.table::fwrite(x = res, file = csv_file, row.names = FALSE)
+
+    rm(res, xyz, file_dt, marker_geoms, coords, elevs, marker_dt)
+
+    output_files <- c(output_files, csv_file)
+
   }
 
-  # Combine all grids and track original shape index
-  out_dt <- data.table::rbindlist(c(list(out_dt, marker_dt), grid_list), use.names = TRUE)
-  data.table::set(out_dt, j = "id", value = seq_len(nrow(out_dt)))
-  if (!is.null(hull)) {
-    attr(out_dt, "hull") <- hull |> terra::geom(wkt = TRUE)
+  # Process str8 raster
+  if ("raster_upload" %in% sg$source) {
+    raster_idx <- which(sg$source == "raster_upload")
+    for (i in raster_idx) {
+      xyz <- fg[[sg[["datapath"]][i]]]$raster
+      res <- ds(xyz)
+      # Write the current res to tif using the same run_id
+      tif_file <- file.path(temp_dir, paste0("downscale_", run_id, "_raster_",i,".tif"))
+      terra::writeRaster(x = res, filename = tif_file, gdal=c("PREDICTOR=2"), datatype="FLT4S", overwrite = TRUE)
+      output_files <- c(output_files, tif_file)
+      rm(xyz, res)
+    }
   }
-  return(out_dt)
+
+  # Process shapes
+  if ("shape" %in% sg[!source %in% "raster_upload"][["group"]]) {
+    map_shape_idx <- which(sg$group %in% "shape" & sg$source %in% "map_draw")
+    file_upload_idx <- which(sg$group %in% "shape" & sg$source %in% "file_upload")
+
+    rastmaker <- \(g) {
+      hull <- terra::minRect(g)
+      lat <- mean(c(terra::ymin(hull), terra::ymax(hull)))
+      y_res <- vstore[["downscale_resolution"]] / 111319  # Latitude resolution
+      x_res <- vstore[["downscale_resolution"]] / (111319 * cos(lat * pi / 180))  # Longitude resolution adjusted for latitude
+      ref <- terra::rast(hull, resolution = c(x_res, y_res)) |>
+        terra::resample(x = cec, y = _, method = "bilinear")
+      return(ref)
+    }
+
+    # Do map draw since no need to loop within for shape list
+    for (i in map_shape_idx) {
+      g <- terra::vect(sg$wkt, crs = "EPSG:4326")
+      xyz <- g |> rastmaker()
+      res <- ds(xyz)
+      res <- terra::mask(res, g)
+      # Write the current res to tif using the same run_id
+      tif_file <- file.path(temp_dir, paste0("downscale_", run_id, "_map_draw_",i,".tif"))
+      terra::writeRaster(x = res, filename = tif_file, gdal=c("PREDICTOR=2"), datatype="FLT4S", overwrite = TRUE)
+      output_files <- c(output_files, tif_file)
+      rm(xyz, res, g)
+    }
+
+    # Do file upload with loop
+    for (i in map_shape_idx) {
+      for (j in seq_along(fg[[sg[["datapath"]][i]]]$shape)) {
+        g <- fg[[sg[["datapath"]][i]]]$shape[j]
+        xyz <- g |> rastmaker()
+        res <- ds(xyz)
+        res <- terra::mask(res, g)
+        # Write the current res to tif using the same run_id
+        tif_file <- file.path(temp_dir, paste0("downscale_", run_id, "_file_upload_", i,"_shape_", j, ".tif"))
+        terra::writeRaster(x = res, filename = tif_file, gdal=c("PREDICTOR=2"), datatype="FLT4S", overwrite = TRUE)
+        output_files <- c(output_files, tif_file)
+        rm(xyz, res, g)
+      }
+    }
+
+  }
+
+  return(output_files)
+
 }
 
 downscale_core_vars <- sort(sprintf(c("PPT_%02d", "Tmax_%02d", "Tmin_%02d"), sort(rep(1:12, 3))))
