@@ -260,7 +260,7 @@ session_geometry <- function() {
                   width = "100%",
                   choices = climr::list_gcms() |> sn(),
                   multiple = TRUE,
-                  selected = list_gcms()[c(1)]
+                  selected = list_gcms()[c(1, 4, 5)]
                 )
               ),
               shiny::div(
@@ -271,7 +271,7 @@ session_geometry <- function() {
                   width = "100%",
                   choices = climr::list_ssps() |> sn(),
                   multiple = TRUE,
-                  selected = list_ssps()[1]
+                  selected = list_ssps()[1:2]
                 )
               ),
             )
