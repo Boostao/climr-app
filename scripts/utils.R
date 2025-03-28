@@ -449,7 +449,7 @@ process_downscale <- function(sg, cec, vstore, fg, run_id) {
     file_upload_idx <- which(sg$group %in% "shape" & sg$source %in% "file_upload")
 
     rastmaker <- \(g) {
-      ref <- rastmakerg(g, cec, vstore[["downscale_resolution"]]) |>
+      ref <- rastmakerg(g, vstore[["downscale_resolution"]]) |>
         terra::resample(x = cec, y = _, method = "bilinear")
       return(ref)
     }
