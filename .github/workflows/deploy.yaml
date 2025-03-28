@@ -22,6 +22,7 @@ jobs:
           Rscript -e "pak::cache_delete()"
           Rscript -e 'pak::pak(upgrade = TRUE, pkg = readLines("pak", warn = FALSE))'
           cp -R ../climr-app /srv/shiny-server/
+          chown -R shiny:shiny /srv/shiny-server/climr-app
           touch /srv/shiny-server/climr-app/restart.txt
           Rscript scripts/utils.R
           
