@@ -357,6 +357,8 @@ session_geometry <- function() {
   push <- function(new, g, s, d = NA_character_) {
     id <- max(c(0L,sg$id))+1L
     sg <<- rbind(sg, data.table::data.table(id = id, wkt = new, group = g, source = s, datapath = d))
+    # To show hull when npoints > 100
+    if (!grepl("POINT", new)) g <- "shape"
     refresh(g)
     session$sendCustomMessage(type="jsCode", list(code = "$('.input-control-body a.shiny-download-link').removeClass('btn-success');"))
   }
@@ -521,6 +523,13 @@ session_geometry <- function() {
         )
 
         new_p <- "MULTIPOINT (%s)" |> sprintf(paste(sprintf("(%s %s)", res[[lon_j]], res[[lat_j]]), collapse = ","))
+        if (nrow(res) > 100) {
+          shiny::showNotification("Uploaded point csv has more than 100 points. Displaying convex hull.", type = "message")
+          new_p <- terra::vect(new_p, "EPSG:4326") |>
+            terra::aggregate() |>
+            terra::convHull() |>
+            terra::geom(wkt = TRUE)
+        }
         push(new_p, "marker", "file_upload", d0)
         return()
 
