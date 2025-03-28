@@ -260,7 +260,7 @@ session_geometry <- function() {
                   width = "100%",
                   choices = climr::list_gcms() |> sn(),
                   multiple = TRUE,
-                  selected = list_gcms()[c(1, 4, 5)]
+                  selected = list_gcms()[c(1)]
                 )
               ),
               shiny::div(
@@ -271,7 +271,7 @@ session_geometry <- function() {
                   width = "100%",
                   choices = climr::list_ssps() |> sn(),
                   multiple = TRUE,
-                  selected = list_ssps()[1:2]
+                  selected = list_ssps()[1]
                 )
               ),
             )
@@ -317,8 +317,8 @@ session_geometry <- function() {
         X = data,
         var1 = input$timeseries_vars,
         obs_ts_dataset = input$timeseries_obs_ts_dataset,
-        gcms = input$bivariate_gcms,
-        ssps = input$bivariate_ssps        
+        gcms = input$timeseries_gcms,
+        ssps = input$timeseries_ssps        
       )
     })    
   }
