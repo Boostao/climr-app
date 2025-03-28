@@ -215,14 +215,21 @@ session_geometry <- function() {
         lat = coords[, 2],
         elev = elevs
       )
-      climr::plot_bivariate_db(
-        xyz = xyz,
-        xvar = input$bivariate_xvars,
-        yvar = input$bivariate_yvars,
-        period_focal = input$bivariate_gcm_periods,
-        gcms = input$bivariate_gcms,
-        ssp = input$bivariate_ssps,
-        interactive = TRUE
+      withCallingHandlers(
+        message = function(m) {shiny::showNotification(ui = shiny::span(conditionMessage(m)), type = "message")},
+        warning = function(w) {shiny::showNotification(ui = shiny::span(conditionMessage(w)), type = "warning")},
+        error = function(e) {shiny::showNotification(ui = shiny::span(conditionMessage(e)), type = "error")},
+        {
+          climr::plot_bivariate_db(
+            xyz = xyz,
+            xvar = input$bivariate_xvars,
+            yvar = input$bivariate_yvars,
+            period_focal = input$bivariate_gcm_periods,
+            gcms = input$bivariate_gcms,
+            ssp = input$bivariate_ssps,
+            interactive = TRUE
+          )
+        }
       )
     })
   }
@@ -306,12 +313,19 @@ session_geometry <- function() {
         lat = coords[, 2],
         elev = elevs
       )
-      data <- climr::plot_timeSeries_input_db(
-        xyz = xyz,
-        gcms = input$timeseries_gcms,
-        ssps = input$timeseries_ssps,
-        obs_ts_dataset = input$timeseries_obs_ts_dataset,
-        vars = input$timeseries_vars,
+      withCallingHandlers(
+        message = function(m) {shiny::showNotification(ui = shiny::span(conditionMessage(m)), type = "message")},
+        warning = function(w) {shiny::showNotification(ui = shiny::span(conditionMessage(w)), type = "warning")},
+        error = function(e) {shiny::showNotification(ui = shiny::span(conditionMessage(e)), type = "error")},
+        {
+          data <- climr::plot_timeSeries_input_db(
+            xyz = xyz,
+            gcms = input$timeseries_gcms,
+            ssps = input$timeseries_ssps,
+            obs_ts_dataset = input$timeseries_obs_ts_dataset,
+            vars = input$timeseries_vars,
+          )
+        }
       )
       climr::plot_timeSeries(
         X = data,
