@@ -27,18 +27,32 @@ session_geometry <- function() {
     output$geom_dt <<- DT::renderDT(server = TRUE, {
       gdt <- data.table::copy(sg[,1:4])
       gdt$wkt[nchar(gdt$wkt) > 90] <- paste0(substr(gdt$wkt[nchar(gdt$wkt) > 90], 1, 87), "...")
-      gdt$action <- vapply(gdt$id, \(id) {
+      gdt$action <- vapply(gdt$id, \(i) {
         shiny::tagList(
           shiny::actionLink(
-            "sg_view_%s" |> sprintf(id),
+            "sg_view_%s" |> sprintf(i),
             "View [\U1F5FA\UFE0F]",
-            onclick = 'Shiny.setInputValue(\"sg_view\", %s, {priority: \"event\"})' |> sprintf(id)
+            onclick = 'Shiny.setInputValue(\"sg_view\", %s, {priority: \"event\"})' |> sprintf(i)
           ),
+          if (sg[id == i, group == "marker" & source == "map_click"]) {
+            shiny::actionLink(
+              "sg_bivariate_%s" |> sprintf(i),
+              "Bivariate [\U1F4CA]",
+              onclick = 'Shiny.setInputValue(\"sg_bivariate\", %s, {priority: \"event\"})' |> sprintf(i)
+            )
+          },
+          if (sg[id == i, group == "marker" & source == "map_click"]) {
+            shiny::actionLink(
+              "sg_timeseries_%s" |> sprintf(i),
+              "Timeseries [\U1F4C8]",
+              onclick = 'Shiny.setInputValue(\"sg_timeseries\", %s, {priority: \"event\"})' |> sprintf(i)
+            )
+          },
           shiny::actionLink(
-            "sg_remove_%s" |> sprintf(id),
+            "sg_remove_%s" |> sprintf(i),
             "Remove [\U274C]",
-            onclick = 'Shiny.setInputValue(\"sg_remove\", %s, {priority: \"event\"})' |> sprintf(id)
-          ),
+            onclick = 'Shiny.setInputValue(\"sg_remove\", %s, {priority: \"event\"})' |> sprintf(i)
+          )
         ) |> as.character()
       }, character(1))
       data.table::setnames(gdt, "wkt", "well-known text")
@@ -108,10 +122,205 @@ session_geometry <- function() {
     shiny::showModal( 
       shiny::modalDialog( 
         title = NULL, 
-        easy_close = TRUE, 
+        easyClose =  TRUE, 
         leaflet::renderLeaflet(m)
       )
     )
+  }
+
+  modal_bivariate <- function(wkt) {
+    shiny::showModal(
+      shiny::modalDialog(size = "xl",
+        shiny::tabsetPanel(
+          shiny::tabPanel("Parameters",
+            shiny::div(
+              title = "Climate variables for x axis.",
+              shiny::selectizeInput(
+                inputId = "bivariate_xvars",
+                label = "Climate variables X Axis",
+                width = "100%",
+                choices = c(downscale_extra_vars, list("Core" = downscale_core_vars)),
+                multiple = FALSE,
+                selected = "Tave_sm"
+              ),
+              shiny::selectizeInput(
+                inputId = "bivariate_yvars",
+                label = "Climate variables Y Axis",
+                width = "100%",
+                choices = c(downscale_extra_vars, list("Core" = downscale_core_vars)),
+                multiple = FALSE,
+                selected = "PPT_sm"
+              ),
+              shiny::div(
+                title = "20-year reference periods for GCM simulations.",
+                shiny::selectInput(
+                  inputId = "bivariate_gcm_periods",
+                  label = "General Circulation Model (GCM) Periods",
+                  width = "100%",
+                  choices = climr::list_gcm_periods() |> sn(),
+                  multiple = TRUE,
+                  selected = climr::list_gcm_periods()[1]
+                )
+              ),
+              shiny::div(
+                title = "Global climate models to downscale. Select multiple GCMs for ensemble outputs.",
+                shiny::selectInput(
+                  inputId = "bivariate_gcms",
+                  label = "Global climate model",
+                  width = "100%",
+                  choices = climr::list_gcms() |> sn(),
+                  multiple = TRUE,
+                  selected = climr::list_gcms()[c(1, 4, 5, 6, 7, 10, 11, 12)]
+                )
+              ),
+              shiny::div(
+                title = "SSP-RCP scenarios pairing shared socioeconomic pathways with representative concentration pathways.",
+                shiny::selectInput(
+                  inputId = "bivariate_ssps",
+                  label = "Shared Socio-economic Pathways (SSP) - Representative Concentration Pathways (RCP) Scenarios",
+                  width = "100%",
+                  choices = climr::list_ssps() |> sn(),
+                  multiple = TRUE,
+                  selected = climr::list_ssps()[2]
+                )
+              ),
+            )
+          ),
+          shiny::tabPanel("Bivariate Plot",
+            plotly::plotlyOutput("bivariate_plot", height = "600px")
+          ),
+          shiny::tabPanel("Description",
+            shiny::div(
+              style = "margin-top: 20px;",
+              shiny::p("Bivariate plots showing 21st century climate change for user-selected locations and climate variables."),
+              shiny::p("Purposes of the plot:"),
+              shiny::tags$ol(
+                shiny::tags$li("Show differences in climate change trends among global climate models (GCMs)"),
+                shiny::tags$li("Show the differences between multiple simulations of each model"),
+                shiny::tags$li("Compare simulated climate change to observed climate change in the 2001-2020 period")
+              ),
+              shiny::p("All climate changes are relative to the 1961-1990 reference period normals.")
+            )
+          )
+        )
+      )
+    )
+    output$bivariate_plot <- plotly::renderPlotly({
+      g <- terra::vect(wkt, crs = "EPSG:4326")
+      coords <- terra::crds(g)
+      elevs <- terra::extract(cec, g, method = "bilinear", ID = FALSE, raw = TRUE)[,1]
+      xyz <- data.table::data.table(
+        id = 1,
+        lon = coords[, 1],
+        lat = coords[, 2],
+        elev = elevs
+      )
+      climr::plot_bivariate_db(
+        xyz = xyz,
+        xvar = input$bivariate_xvars,
+        yvar = input$bivariate_yvars,
+        period_focal = input$bivariate_gcm_periods,
+        gcms = input$bivariate_gcms,
+        ssp = input$bivariate_ssps,
+        interactive = TRUE
+      )
+    })
+  }
+
+  modal_timeseries <- function(wkt) {
+    shiny::showModal(
+      shiny::modalDialog(size = "xl",
+        shiny::tabsetPanel(
+          shiny::tabPanel("Parameters",
+            shiny::div(
+              title = "Climate variables.",
+              shiny::selectizeInput(
+                inputId = "timeseries_vars",
+                label = "Climate variables",
+                width = "100%",
+                choices = c(downscale_extra_vars, list("Core" = downscale_core_vars)),
+                multiple = FALSE,
+                selected = "Tmin_sm"
+              ),
+              shiny::div(
+                title = "Dataset for observational time series data. Options: 'climatena' for ClimateNA gridded time series, 'cru.gpcc' for CRU TS (temperature) and GPCC (precipitation), or 'Null' for none.",
+                shiny::selectInput(
+                  inputId = "timeseries_obs_ts_dataset",
+                  label = "Observation time-series data",
+                  width = "100%",
+                  choices = c("ClimateNA" = "climatena", "Climatic Research Unit / Global Precipitation Climatology Centre" = "cru.gpcc"),
+                  selected = "climatena",
+                )
+              ),
+              shiny::div(
+                title = "Global climate models to downscale. Select multiple GCMs for ensemble outputs.",
+                shiny::selectInput(
+                  inputId = "timeseries_gcms",
+                  label = "Global climate model",
+                  width = "100%",
+                  choices = climr::list_gcms() |> sn(),
+                  multiple = TRUE,
+                  selected = list_gcms()[c(1)]
+                )
+              ),
+              shiny::div(
+                title = "SSP-RCP scenarios pairing shared socioeconomic pathways with representative concentration pathways.",
+                shiny::selectInput(
+                  inputId = "timeseries_ssps",
+                  label = "Shared Socio-economic Pathways (SSP) - Representative Concentration Pathways (RCP) Scenarios",
+                  width = "100%",
+                  choices = climr::list_ssps() |> sn(),
+                  multiple = TRUE,
+                  selected = list_ssps()[1]
+                )
+              ),
+            )
+          ),
+          shiny::tabPanel("Timeseries Plot",
+            shiny::plotOutput("timeseries_plot", height = "600px")
+          ),
+          shiny::tabPanel("Description",
+            shiny::div(
+              style = "margin-top: 20px;",
+              shiny::p("Time series plots of 20th and 21st century climate change for user-selected locations and climate variables."),
+              shiny::p("Purposes of the plot:"),
+              shiny::tags$ul(
+                shiny::tags$li("View differences in interannual variability and climate change trends among global climate models (GCMs)"),
+                shiny::tags$li("View the differences between multiple simulations of each model"),
+                shiny::tags$li("Compare simulated and observed climate change from 1901 to present"),
+                shiny::tags$li("Compare time series of two different variables")
+              ),
+              shiny::p("All global climate model anomalies are bias-corrected to the 1961-1990 reference period normals.")
+            )
+          )
+        )
+      )
+    )
+    output$timeseries_plot <- shiny::renderPlot({
+      g <- terra::vect(wkt, crs = "EPSG:4326")
+      coords <- terra::crds(g)
+      elevs <- terra::extract(cec, g, method = "bilinear", ID = FALSE, raw = TRUE)[,1]
+      xyz <- data.table::data.table(
+        id = 1,
+        lon = coords[, 1],
+        lat = coords[, 2],
+        elev = elevs
+      )
+      data <- climr::plot_timeSeries_input_db(
+        xyz = xyz,
+        gcms = input$timeseries_gcms,
+        ssps = input$timeseries_ssps,
+        obs_ts_dataset = input$timeseries_obs_ts_dataset,
+        vars = input$timeseries_vars,
+      )
+      climr::plot_timeSeries(
+        X = data,
+        var1 = input$timeseries_vars,
+        obs_ts_dataset = input$timeseries_obs_ts_dataset,
+        gcms = input$bivariate_gcms,
+        ssps = input$bivariate_ssps        
+      )
+    })    
   }
 
   refresh <- function(g) {
@@ -150,6 +359,14 @@ session_geometry <- function() {
   view_map <- function(rid) {
     g <- sg[id == rid, unique(group)]
     modal_map(sg[id == rid][["wkt"]], g)
+  }
+
+  plot_bivariate <- function(rid) {
+    modal_bivariate(sg[id == rid][["wkt"]])
+  }
+
+  plot_timeseries <- function(rid) {
+    modal_timeseries(sg[id == rid][["wkt"]])
   }
 
   click_enabled <- TRUE
@@ -389,6 +606,12 @@ session_geometry <- function() {
     },
     view = function(rid) {
       view_map(rid)
+    },
+    bivariate = function(rid) {
+      plot_bivariate(rid)
+    },
+    timeseries = function(rid) {
+      plot_timeseries(rid)
     },
     add_point_enabled = function(val) {
       if (missing(val)) return(click_enabled)

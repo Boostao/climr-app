@@ -375,6 +375,14 @@ shiny::shinyApp(
       if (shiny::in_devmode()) cat("Event: sg_view", sep = "\n")
       sg$view(input$sg_view)
     })
+    shiny::observeEvent(input$sg_bivariate, {
+      if (shiny::in_devmode()) cat("Event: sg_bivariate", sep = "\n")
+      sg$bivariate(input$sg_bivariate)
+    })
+    shiny::observeEvent(input$sg_timeseries, {
+      if (shiny::in_devmode()) cat("Event: sg_timeseries", sep = "\n")
+      sg$timeseries(input$sg_timeseries)
+    })
 
     sn <- \(j) setNames(j,j)
 
@@ -382,7 +390,7 @@ shiny::shinyApp(
     downscale_modal <- function() {
       shiny::showModal(
         shiny::modalDialog(
-          title = "Downscale Parameters", size = "xl", easyClose = TRUE, fade = FALSE, class = "modal-dialog-scrollable",
+          title = "Downscale Parameters", size = "xl", fade = FALSE, class = "modal-dialog-scrollable",
           shiny::div(
             title = "Which map of 1961-1990 climatological normals to use as the high-resolution reference climate map for downscaling. 'auto' selects the best available map per point.",
             shiny::selectInput(
@@ -705,7 +713,7 @@ shiny::shinyApp(
       })
       shiny::showModal(
         shiny::modalDialog(
-          title = "Preferences for Downscale Processing", size = "l", easyClose = TRUE, fade = FALSE,
+          title = "Preferences for Downscale Processing", size = "l",
           shiny::div(
             title = "tif: Shapes/rasters are returned as GeoTIFF. csv: all points are returned in csv.",
             shiny::radioButtons(
@@ -764,8 +772,6 @@ shiny::shinyApp(
         shiny::modalDialog(
           title = "Climate Overlay Selection",
           size = "xl",
-          easyClose = TRUE,
-          fade = FALSE,
           shiny::selectInput(
             inputId = "tifsource",
             label = "Source",
