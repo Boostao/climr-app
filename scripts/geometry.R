@@ -13,9 +13,9 @@ session_geometry <- function() {
   fg_ <- function(d0, ...) {
     unlink(names(fg), recursive = TRUE)
     fg <<- list()
-    if ("file_upload" %in% sg$source) {
+    if (any(c("file_upload", "raster_upload") %in% sg$source)) {
       shiny::showNotification("Replacing previous file upload geometries.", type = "warning")
-      sg <<- sg[source != "file_upload",]
+      sg <<- sg[!source %in% c("file_upload", "raster_upload"),]
     }
     fg[[d0]] <<- list(...)
     return()
@@ -649,9 +649,19 @@ session_geometry <- function() {
       else click_enabled <<- val
     },
     approx_count = function(resolution = 2500) {
-      marker_idx <- which(sg$group == "marker")
+      marker_idx <- which(sg$group == "marker" & sg$source == "map_click")
       shape_idx <- which(sg$group == "shape")
     
+      rastmaker <- \(g) {
+        hull <- terra::minRect(g)
+        lat <- mean(c(terra::ymin(hull), terra::ymax(hull)))
+        y_res <- resolution / 111319  # Latitude resolution
+        x_res <- resolution / (111319 * cos(lat * pi / 180))  # Longitude resolution adjusted for latitude
+        ref <- terra::rast(hull, resolution = c(x_res, y_res)) |>
+          terra::resample(x = cec, y = _, method = "bilinear")
+        return(ref)
+      }
+
       approx_pts_shape <- vapply(
         sg[group == "shape", wkt],
         \(x) {

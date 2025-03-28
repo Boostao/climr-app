@@ -449,11 +449,7 @@ process_downscale <- function(sg, cec, vstore, fg, run_id) {
     file_upload_idx <- which(sg$group %in% "shape" & sg$source %in% "file_upload")
 
     rastmaker <- \(g) {
-      hull <- terra::minRect(g)
-      lat <- mean(c(terra::ymin(hull), terra::ymax(hull)))
-      y_res <- vstore[["downscale_resolution"]] / 111319  # Latitude resolution
-      x_res <- vstore[["downscale_resolution"]] / (111319 * cos(lat * pi / 180))  # Longitude resolution adjusted for latitude
-      ref <- terra::rast(hull, resolution = c(x_res, y_res)) |>
+      ref <- rastmakerg(g, cec, vstore[["downscale_resolution"]]) |>
         terra::resample(x = cec, y = _, method = "bilinear")
       return(ref)
     }
@@ -514,3 +510,12 @@ downscale_extra_vars <- local({
     "Annual" = lbl[annual_idx]
   )
 })
+
+rastmakerg <- function(g, resolution) {
+  hull <- terra::minRect(g)
+  lat <- mean(c(terra::ymin(hull), terra::ymax(hull)))
+  y_res <- resolution / 111319  # Latitude resolution
+  x_res <- resolution / (111319 * cos(lat * pi / 180))  # Longitude resolution adjusted for latitude
+  ref <- terra::rast(hull, resolution = c(x_res, y_res))
+  return(ref)
+}
