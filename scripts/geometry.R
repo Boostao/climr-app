@@ -10,6 +10,16 @@ session_geometry <- function() {
   )
 
   fg <- list()
+  fg_ <- function(d0, ...) {
+    unlink(names(fg), recursive = TRUE)
+    fg <<- list()
+    if ("file_upload" %in% sg$source) {
+      shiny::showNotification("Replacing previous file upload geometries.", type = "warning")
+      sg <<- sg[source != "file_upload",]
+    }
+    fg[[d0]] <<- list(...)
+    return()
+  }
 
   mp <- leaflet::leafletProxy("climr")
   
@@ -73,7 +83,7 @@ session_geometry <- function() {
   refresh_DT()
 
   update_map_marker <- function() {
-    mg <- sg[group == "marker"]
+    mg <- sg[group == "marker" & grepl("POINT", wkt)]
     mp |> leaflet::clearGroup("sg_marker")
     if (nrow(mg)) {
       mp |> leaflet::addAwesomeMarkers(
@@ -86,7 +96,7 @@ session_geometry <- function() {
   }
 
   update_map_shape <- function() {
-    mg <- sg[group == "shape"]
+    mg <- sg[group == "shape" | grepl("POLYGON", wkt)]
     mp |> leaflet::clearGroup("sg_shape") |>
       leaflet.extras::removeDrawToolbar(clearFeatures = TRUE) |>
       default_draw_tool()
@@ -104,13 +114,13 @@ session_geometry <- function() {
   }
 
   modal_map <- function(wkt, g) {
-    if ("marker" %in% g) {
+    if ("marker" %in% g & grepl("POINT", wkt)) {
       m <- mview |> leaflet::addAwesomeMarkers(
         data = terra::vect(wkt),
         group = "sg_marker",
         icon = default_icon
       )
-    } else if ("shape" %in% g ) {
+    } else if ("shape" %in% g | grepl("POLYGON", wkt)) {
       m <- mview |> leaflet::addPolygons(
         data = terra::vect(wkt),
         fillColor = "#fcba19",
@@ -463,7 +473,7 @@ session_geometry <- function() {
           }
 
           # Add to file geometries
-          fg[[d0]] <<- list(
+          fg_(d0,
             "datapath" = f0,
             "type" = "text",
             "id" = id_j,
@@ -478,6 +488,13 @@ session_geometry <- function() {
             terra::geom(wkt = TRUE)
 
           if (terra::is.points(shape)) {
+            if (length(shape) > 100) {
+              shiny::showNotification("Uploaded point geometry has more than 100 points. Displaying convex hull.", type = "message")
+              new_p <- shape |>
+                terra::aggregate() |>
+                terra::convHull() |>
+                terra::geom(wkt = TRUE)
+            }
             push(new_p, "marker", "file_upload", d0)
           } else {
             push(new_p, "shape", "file_upload", d0)
@@ -493,7 +510,7 @@ session_geometry <- function() {
         }
 
         # Add to file geometries
-        fg[[d0]] <<- list(
+        fg_(d0,
           "datapath" = f0,
           "type" = "text",
           "id" = id_j,
@@ -523,7 +540,7 @@ session_geometry <- function() {
         }
 
         # Add to file geometries
-        fg[[d0]] <<- list(
+        fg_(d0,
           "datapath" = f0,
           "type" = "raster",
           "raster" = res
@@ -553,7 +570,7 @@ session_geometry <- function() {
         }
 
         # Add to file geometries
-        fg[[d0]] <<- list(
+        fg_(d0,
           "datapath" = f0,
           "type" = "shape",
           "shape" = res
