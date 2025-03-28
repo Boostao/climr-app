@@ -648,37 +648,63 @@ session_geometry <- function() {
       if (missing(val)) return(click_enabled)
       else click_enabled <<- val
     },
-    approx_count = function(resolution = 2500) {
-      marker_idx <- which(sg$group == "marker" & sg$source == "map_click")
-      shape_idx <- which(sg$group == "shape")
-    
-      rastmaker <- \(g) {
-        hull <- terra::minRect(g)
-        lat <- mean(c(terra::ymin(hull), terra::ymax(hull)))
-        y_res <- resolution / 111319  # Latitude resolution
-        x_res <- resolution / (111319 * cos(lat * pi / 180))  # Longitude resolution adjusted for latitude
-        ref <- terra::rast(hull, resolution = c(x_res, y_res)) |>
-          terra::resample(x = cec, y = _, method = "bilinear")
-        return(ref)
+    process_count = function(resolution = 2500) {
+      # Process all loose points first
+      marker <- 0
+      marker_count <- 0
+      if ("marker" %in% sg[["group"]]) {
+        marker_count <- sum(sg$group == "marker" & sg$source == "map_click")
+        marker <- marker_count
+        file_idx <- which(sg$group == "marker" & sg$source == "file_upload")
+        if (length(file_idx)) {
+          marker <- sum(marker, length(file_idx))
+          marker_count <- vapply(file_idx, \(i) {
+            curf <- fg[[sg[["datapath"]][i]]]
+            nrow(curf$table)  
+          }, FUN.VALUE = integer(1)) |> sum(marker_count, na.rm = TRUE)
+        }
       }
-
-      approx_pts_shape <- vapply(
-        sg[group == "shape", wkt],
-        \(x) {
-          area <- terra::vect(x, crs = "EPSG:4326") |>
-            terra::expanse("m")
-          floor(area / (resolution ^ 2))
-        },
-        FUN.VALUE = numeric(1),
-        USE.NAMES = FALSE
-      ) |> sum(na.rm = TRUE)
+    
+      # Process str8 raster
+      shape <- 0
+      shape_count <- 0
+      if ("raster_upload" %in% sg$source) {
+        raster_idx <- which(sg$source == "raster_upload")
+        for (i in raster_idx) {
+          shape <- shape + 1
+          shape_count <- shape_count + {fg[[sg[["datapath"]][i]]]$raster |> terra::ncell()}
+        }
+      }
+    
+      # Process shapes
+      if ("shape" %in% sg[!source %in% "raster_upload"][["group"]]) {
+        map_shape_idx <- which(sg$group %in% "shape" & sg$source %in% "map_draw")
+        file_upload_idx <- which(sg$group %in% "shape" & sg$source %in% "file_upload")
+        # Do map draw since no need to loop within for shape list
+        for (i in map_shape_idx) {
+          shape <- shape + 1
+          shape_count <- shape_count + {terra::vect(sg$wkt[i], crs = "EPSG:4326") |>
+            rastmakerg(resolution) |>
+            terra::ncell()}
+        }
+    
+        # Do file upload with loop
+        for (i in file_upload_idx) {
+          for (j in seq_along(fg[[sg[["datapath"]][i]]]$shape)) {
+            shape <- shape + 1
+            shape_count <- shape_count + {fg[[sg[["datapath"]][i]]]$shape[j] |>
+              rastmakerg(resolution) |>
+              terra::ncell()}
+          }
+        }
+      }
       
       return(
         list(
-          marker = length(marker_idx),
-          marker_count = length(marker_idx),
-          shape = approx_pts_shape,
-          shape_count = length(shape_idx)
+          marker = marker,
+          marker_count = marker_count,
+          shape = shape,
+          shape_count = shape_count
         )
       )
     }

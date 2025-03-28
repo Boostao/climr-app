@@ -456,7 +456,7 @@ process_downscale <- function(sg, cec, vstore, fg, run_id) {
 
     # Do map draw since no need to loop within for shape list
     for (i in map_shape_idx) {
-      g <- terra::vect(sg$wkt, crs = "EPSG:4326")
+      g <- terra::vect(sg$wkt[i], crs = "EPSG:4326")
       xyz <- g |> rastmaker()
       res <- ds(xyz)
       res <- terra::mask(res, g)

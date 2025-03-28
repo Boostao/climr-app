@@ -695,7 +695,7 @@ shiny::shinyApp(
       if (shiny::in_devmode()) cat("Event: downscale_process", sep = "\n")
       vstore[["processing"]] <- FALSE
       output$downscale_points_count_estimate <- shiny::renderUI({
-        pce <- sg$approx_count(vstore[["downscale_resolution"]])
+        pce <- sg$process_count(vstore[["downscale_resolution"]])
         bslib::card(
           full_screen = FALSE,
           height = "auto",
@@ -704,9 +704,9 @@ shiny::shinyApp(
           fill = TRUE,
           bslib::card_body(
             shiny::tags$span(
-              if (pce$marker_count > 0) "[%s] point geometries from [%s] markers." |> sprintf(format(pce$marker, big.mark = ","), format(pce$marker_count, big.mark = ",")),
+              if (pce$marker_count > 0) "[%s] points from [%s] markers geometries." |> sprintf(format(pce$marker_count, big.mark = ","), format(pce$marker, big.mark = ",")),
               shiny::br(),
-              if (pce$shape_count > 0) "[%s] point geometries from [%s] shapes (approximate using resolution)." |> sprintf(format(pce$shape, big.mark = ","), format(pce$shape_count, big.mark = ","))
+              if (pce$shape_count > 0) "[%s] points from [%s] shapes geometries." |> sprintf(format(pce$shape_count, big.mark = ","), format(pce$shape, big.mark = ","))
             )
           )
         )
