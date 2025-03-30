@@ -58,6 +58,13 @@ session_geometry <- function() {
               onclick = 'Shiny.setInputValue(\"sg_timeseries\", %s, {priority: \"event\"})' |> sprintf(i)
             )
           },
+          if (sg[id == i, group == "marker" & source == "map_click"]) {
+            shiny::actionLink(
+              "sg_climate_diagram_%s" |> sprintf(i),
+              "Climate Diagram [\U1F4C8]",
+              onclick = 'Shiny.setInputValue(\"sg_climate_diagram\", %s, {priority: \"event\"})' |> sprintf(i)
+            )
+          },
           shiny::actionLink(
             "sg_remove_%s" |> sprintf(i),
             "Remove [\U274C]",
@@ -347,6 +354,100 @@ session_geometry <- function() {
     })    
   }
 
+  modal_climate_diagram <- function(wkt) {
+    shiny::showModal(
+      shiny::modalDialog(size = "xl",
+                         shiny::tabsetPanel(
+                           shiny::tabPanel("Parameters",
+                            shiny::div( title = "Climate Diagram Parameters",
+                                                       
+                                          shiny::div(
+                                              title = "Global climate models to downscale. Select multiple GCMs for ensemble outputs.",
+                                              shiny::selectInput(
+                                                inputId = "climate_diagram_gcms",
+                                                label = "Global climate model",
+                                                width = "100%",
+                                                choices = climr::list_gcms() |> sn(),
+                                                multiple = TRUE,
+                                                selected = NULL
+                                              )
+                                            ),
+                                            shiny::div(
+                                              title = "SSP-RCP scenarios pairing shared socioeconomic pathways with representative concentration pathways.",
+                                              shiny::selectInput(
+                                                inputId = "climate_diagram_ssps",
+                                                label = "Shared Socio-economic Pathways (SSP) - Representative Concentration Pathways (RCP) Scenarios",
+                                                width = "100%",
+                                                choices = climr::list_ssps() |> sn(),
+                                                multiple = TRUE,
+                                                selected = NULL
+                                              )
+                                            ),
+                                            shiny::div(
+                                              title = "20-year reference periods for GCM simulations.",
+                                              shiny::selectInput(
+                                                inputId = "climate_diagram_gcm_periods",
+                                                label = "General Circulation Model (GCM) Periods",
+                                                width = "100%",
+                                                choices = climr::list_gcm_periods() |> sn(),
+                                                multiple = TRUE,
+                                                selected = NULL
+                                              )
+                                            ),
+                                            
+                                           )
+                           ),
+                           shiny::tabPanel("Climate Diagram",
+                                           shiny::plotOutput("climate_diagram_plot", height = "600px")
+                           ),
+                           shiny::tabPanel("Description",
+                                           shiny::div(
+                                             style = "margin-top: 20px;",
+                                             shiny::p("Walter-Lieth Climate Diagram."),
+                                             shiny::p("Purposes of the diagram:"),
+                                             shiny::tags$ul(
+                                               shiny::tags$li("Allow identification of humid and drought periods over a year"),
+                                               shiny::tags$li("Allow for an easy climate comparison between geographic locations")
+                                             ),
+                                             shiny::p("All global climate model anomalies are bias-corrected to the 1961-1990 reference period normals.")
+                                           )
+                           )
+                         )
+      )
+    )
+    output$climate_diagram_plot <- shiny::renderPlot({
+      g <- terra::vect(wkt, crs = "EPSG:4326")
+      coords <- terra::crds(g)
+      elevs <- terra::extract(cec, g, method = "bilinear", ID = FALSE, raw = TRUE)[,1]
+      xyz <- data.table::data.table(
+        id = 1,
+        lon = coords[, 1],
+        lat = coords[, 2],
+        elev = elevs
+      )
+      withCallingHandlers(
+        message = function(m) {shiny::showNotification(ui = shiny::span(conditionMessage(m)), type = "message")},
+        warning = function(w) {shiny::showNotification(ui = shiny::span(conditionMessage(w)), type = "warning")},
+        error = function(e) {shiny::showNotification(ui = shiny::span(conditionMessage(e)), type = "error")},
+        {
+          data <- climr::create_climate_diagram_input(
+            xyz = xyz,
+            gcms = input$climate_diagram_gcms,
+            ssps = input$climate_diagram_ssps,
+            gcm_periods = input$climate_diagram_gcm_periods,
+            use_downscale_db = TRUE
+          )#
+        }
+      )
+      climr::create_climate_diagram(
+        temp = data$Tave,
+        precip = data$PPT,
+        elev = data$elev        
+      )
+    })    
+  }
+  
+  
   refresh <- function(g) {
     refresh_DT()
     shiny::updateActionButton(inputId = "downscale_process", disabled = {nrow(sg) <= 0})
@@ -393,6 +494,10 @@ session_geometry <- function() {
 
   plot_timeseries <- function(rid) {
     modal_timeseries(sg[id == rid][["wkt"]])
+  }
+  
+  plot_climate_diagram <- function(rid) {
+    modal_climate_diagram(sg[id == rid][["wkt"]])
   }
 
   click_enabled <- TRUE
@@ -652,6 +757,9 @@ session_geometry <- function() {
     },
     timeseries = function(rid) {
       plot_timeseries(rid)
+    },
+    climate_diagram = function(rid) {
+      plot_climate_diagram(rid)
     },
     add_point_enabled = function(val) {
       if (missing(val)) return(click_enabled)

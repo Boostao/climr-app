@@ -383,6 +383,10 @@ shiny::shinyApp(
       if (shiny::in_devmode()) cat("Event: sg_timeseries", sep = "\n")
       sg$timeseries(input$sg_timeseries)
     })
+    shiny::observeEvent(input$sg_climate_diagram, {
+      if (shiny::in_devmode()) cat("Event: sg_climate_diagram", sep = "\n")
+      sg$climate_diagram(input$sg_climate_diagram)
+    })
 
     sn <- \(j) setNames(j,j)
 
