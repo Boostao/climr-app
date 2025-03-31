@@ -706,6 +706,7 @@ session_geometry <- function() {
     process = function() {
       vstore[["processing"]] <- TRUE
       shiny::updateActionButton(inputId = "downscale_process", disabled = TRUE)
+      shiny::updateActionButton(inputId = "downscale_process_launch", disabled = TRUE)
       withCallingHandlers(
         message = function(m) {shiny::showNotification(ui = shiny::span(conditionMessage(m)), type = "message")},
         warning = function(w) {shiny::showNotification(ui = shiny::span(conditionMessage(w)), type = "warning")},
@@ -740,6 +741,7 @@ session_geometry <- function() {
         }
       )
       vstore[["processing"]] <- FALSE
+      shiny::updateActionButton(inputId = "downscale_process_launch", disabled = FALSE)
       shiny::updateActionButton(inputId = "downscale_process", disabled = FALSE)
       shiny::removeModal()
     },

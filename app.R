@@ -979,8 +979,9 @@ shiny::shinyApp(
     # Cleanup when the app stops
     shiny::onStop(function() {
       # Remove all files in the tempdir and the directory itself
-      unlink(tempdir(), recursive = TRUE)
-      message("Temporary folder deleted: ", tempdir())
+      d <- list.dirs(tempdir(), full.names = TRUE, recursive = TRUE) |>
+        setdiff(tempdir())
+      unlink(d, recursive = TRUE)
     })
 
   }
