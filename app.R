@@ -387,6 +387,10 @@ shiny::shinyApp(
       if (shiny::in_devmode()) cat("Event: sg_climate_diagram", sep = "\n")
       sg$climate_diagram(input$sg_climate_diagram)
     })
+    shiny::observeEvent(input$sg_boxplot, {
+      if (shiny::in_devmode()) cat("Event: sg_boxplot", sep = "\n")
+      sg$boxplot(input$sg_boxplot)
+    })
 
     sn <- \(j) setNames(j,j)
 

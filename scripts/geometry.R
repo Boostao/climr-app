@@ -65,6 +65,13 @@ session_geometry <- function() {
               onclick = 'Shiny.setInputValue(\"sg_climate_diagram\", %s, {priority: \"event\"})' |> sprintf(i)
             )
           },
+          if (sg[id == i, group == "marker" & source == "map_click"]) {
+            shiny::actionLink(
+              "sg_bloxplot_%s" |> sprintf(i),
+              "Boxplot [\U1F4C8]",
+              onclick = 'Shiny.setInputValue(\"sg_boxplot\", %s, {priority: \"event\"})' |> sprintf(i)
+            )
+          },
           shiny::actionLink(
             "sg_remove_%s" |> sprintf(i),
             "Remove [\U274C]",
@@ -447,6 +454,96 @@ session_geometry <- function() {
     })    
   }
   
+  modal_boxplot <- function(wkt) {
+    shiny::showModal(
+      shiny::modalDialog(size = "xl",
+                         shiny::tabsetPanel(
+                           shiny::tabPanel("Parameters",
+                                           shiny::div( title = "Boxplot Parameters",
+                                                       
+                                                       shiny::div(
+                                                         title = "Global climate models to downscale. Select multiple GCMs for ensemble outputs.",
+                                                         shiny::selectInput(
+                                                           inputId = "boxplot_gcms",
+                                                           label = "Global climate model",
+                                                           width = "100%",
+                                                           choices = climr::list_gcms() |> sn(),
+                                                           multiple = TRUE,
+                                                           selected = climr::list_gcms()[1]
+                                                         )
+                                                       ),
+                                                       shiny::div(
+                                                         title = "SSP-RCP scenarios pairing shared socioeconomic pathways with representative concentration pathways.",
+                                                         shiny::selectInput(
+                                                           inputId = "boxplot_ssps",
+                                                           label = "Shared Socio-economic Pathways (SSP) - Representative Concentration Pathways (RCP) Scenarios",
+                                                           width = "100%",
+                                                           choices = climr::list_ssps() |> sn(),
+                                                           multiple = TRUE,
+                                                           selected = climr::list_ssps()[2]
+                                                         )
+                                                       ),
+                                                       shiny::div(
+                                                         title = "Variable to display",
+                                                         shiny::selectInput(
+                                                           inputId = "boxplot_by_var",
+                                                           label = "Variable to plot on the x axis - Temperatures (Tmin, Tmax, Tave) or Precipitations (PPT)",
+                                                           width = "100%",
+                                                           choices = c("Tmin", "Tmax", "Tave", "PPT") |> sn(),
+                                                           multiple = FALSE,
+                                                           selected = "PPT"
+                                                         )
+                                                       ),
+                                                       
+                                           )
+                           ),
+                           shiny::tabPanel("Boxplot",
+                                           shiny::plotOutput("boxplot", height = "600px")
+                           ),
+                           shiny::tabPanel("Description",
+                                           shiny::div(
+                                             style = "margin-top: 20px;",
+                                             shiny::p("Boxplot."),
+                                             shiny::p("Purposes of the plot:"),
+                                             shiny::tags$ul(
+                                               shiny::tags$li("Allow comparison of distribution over a year"),
+                                               shiny::tags$li("View the outliers for each months")
+                                             ),
+                                             shiny::p("All global climate model anomalies are bias-corrected to the 1961-1990 reference period normals.")
+                                           )
+                           )
+                         )
+      )
+    )
+    output$boxplot <- shiny::renderPlot({
+      g <- terra::vect(wkt, crs = "EPSG:4326")
+      coords <- terra::crds(g)
+      elevs <- terra::extract(cec, g, method = "bilinear", ID = FALSE, raw = TRUE)[,1]
+      xyz <- data.table::data.table(
+        id = 1,
+        lon = coords[, 1],
+        lat = coords[, 2],
+        elev = elevs
+      )
+      withCallingHandlers(
+        message = function(m) {shiny::showNotification(ui = shiny::span(conditionMessage(m)), type = "message")},
+        warning = function(w) {shiny::showNotification(ui = shiny::span(conditionMessage(w)), type = "warning")},
+        error = function(e) {shiny::showNotification(ui = shiny::span(conditionMessage(e)), type = "error")},
+        {
+          data <- climr::create_boxplot_input(
+            xyz = xyz, 
+            gcms = input$boxplot_gcms,
+            ssps = input$boxplot_ssps,
+            use_downscale_db = TRUE
+          )
+        }
+      )
+      climr::create_boxplot(
+        dt = data,
+        var = input$boxplot_by_var      
+      )
+    })    
+  }
   
   refresh <- function(g) {
     refresh_DT()
@@ -498,6 +595,10 @@ session_geometry <- function() {
   
   plot_climate_diagram <- function(rid) {
     modal_climate_diagram(sg[id == rid][["wkt"]])
+  }
+  
+  plot_boxplot <- function(rid) {
+    modal_boxplot(sg[id == rid][["wkt"]])
   }
 
   click_enabled <- TRUE
@@ -760,6 +861,9 @@ session_geometry <- function() {
     },
     climate_diagram = function(rid) {
       plot_climate_diagram(rid)
+    },
+    boxplot = function(rid) {
+      plot_boxplot(rid)
     },
     add_point_enabled = function(val) {
       if (missing(val)) return(click_enabled)
