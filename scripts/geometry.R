@@ -11,11 +11,10 @@ session_geometry <- function() {
 
   fg <- list()
   fg_ <- function(d0, ...) {
-    unlink(names(fg), recursive = TRUE)
-    fg <<- list()
-    if (any(c("file_upload", "raster_upload") %in% sg$source)) {
+    to_rem <- sg[source %in% c("file_upload", "raster_upload")]$id
+    if (length(to_rem)) {
       shiny::showNotification("Replacing previous file upload geometries.", type = "warning")
-      sg <<- sg[!source %in% c("file_upload", "raster_upload"),]
+      rem(to_rem)
     }
     fg[[d0]] <<- list(...)
     return()
@@ -472,7 +471,7 @@ session_geometry <- function() {
     d <- unique(t$datapath)
     d <- d[!is.na(d)]
     if (length(d)) {
-      fg[d] <<- NULL
+      fg[[d]] <<- NULL
       unlink(d, recursive = TRUE)
     }
 
@@ -536,6 +535,12 @@ session_geometry <- function() {
       f <- as.list(f)
       f0 <- f$datapath
       d0 <- dirname(f$datapath)
+
+      if (tolower(tools::file_ext(f0)) %in% c("shp")) {
+        shiny::showNotification("Shape file needs to be uploaded as an archive with .shx, .dbf, .shp and other optional files like .prj.", type = "error")
+        return()
+      }
+
       # does it need unzipping before continuing processing?
       if (tolower(tools::file_ext(f$name)) %in% c("zip","tar","gz","xz","7z","bz2")) {
         farch <- try(archive::archive_extract(f0, d0), silent = TRUE)
