@@ -587,7 +587,17 @@ session_geometry <- function() {
                                            )
                            ),
                            shiny::tabPanel("Climate Stripes",
-                                           plotly::plotlyOutput("climate_stripes", height = "600px")
+                                           shiny::tabsetPanel(
+                                             shiny::tabPanel(
+                                               "Stripes",
+                                               plotly::plotlyOutput("climate_stripes", height = "600px")
+                                             ),
+                                             shiny::tabPanel(
+                                               "Bars with scales",
+                                               plotly::plotlyOutput("climate_stripes_with_scales", height = "600px")
+                                             )
+                                           )
+                                          
                            ),
                            shiny::tabPanel("Description",
                                            shiny::div(
@@ -604,7 +614,7 @@ session_geometry <- function() {
       )
     )
     
-    output$climate_stripes <- plotly::renderPlotly({
+    climate_stripes_input <- reactive({
       g <- terra::vect(wkt, crs = "EPSG:4326")
       coords <- terra::crds(g)
       elevs <- terra::extract(cec, g, method = "bilinear", ID = FALSE, raw = TRUE)[,1]
@@ -627,12 +637,22 @@ session_geometry <- function() {
           )
         }
       )
+      return(data)
+    })
+    output$climate_stripes <- plotly::renderPlotly({
+     
       climr::create_climate_stripes(
-        dt = data
+        dt = climate_stripes_input()
       )
     })    
-  }
   
+  output$climate_stripes_with_scales <- plotly::renderPlotly({
+    climr::create_climate_stripes(
+      dt = climate_stripes_input(),
+      mode = "bars_with_scale"
+    )
+  })    
+  }
   
   refresh <- function(g) {
     refresh_DT()
