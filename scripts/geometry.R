@@ -604,7 +604,7 @@ session_geometry <- function() {
       )
     )
     
-    output$climate_stripes <- shiny::renderPlot({
+    output$climate_stripes <- plotly::renderPlotly({
       g <- terra::vect(wkt, crs = "EPSG:4326")
       coords <- terra::crds(g)
       elevs <- terra::extract(cec, g, method = "bilinear", ID = FALSE, raw = TRUE)[,1]
