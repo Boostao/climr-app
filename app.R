@@ -14,6 +14,7 @@ suppressPackageStartupMessages({
   library(terra)
   library(climr)
   library(zip)
+  library(plotly)
   source("scripts/utils.R", local = TRUE)
 })
 
@@ -386,6 +387,14 @@ shiny::shinyApp(
     shiny::observeEvent(input$sg_climate_diagram, {
       if (shiny::in_devmode()) cat("Event: sg_climate_diagram", sep = "\n")
       sg$climate_diagram(input$sg_climate_diagram)
+    })
+    shiny::observeEvent(input$sg_boxplot, {
+      if (shiny::in_devmode()) cat("Event: sg_boxplot", sep = "\n")
+      sg$boxplot(input$sg_boxplot)
+    })
+    shiny::observeEvent(input$sg_climate_stripes, {
+      if (shiny::in_devmode()) cat("Event: sg_climate_stripes", sep = "\n")
+      sg$climate_stripes(input$sg_climate_stripes)
     })
 
     sn <- \(j) setNames(j,j)
