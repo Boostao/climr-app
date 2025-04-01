@@ -592,7 +592,7 @@ session_geometry <- function() {
                            shiny::tabPanel("Description",
                                            shiny::div(
                                              style = "margin-top: 20px;",
-                                             shiny::p("Boxplot."),
+                                             shiny::p("Climate Stripes"),
                                              shiny::p("Purposes of the plot:"),
                                              shiny::tags$ul(
                                                shiny::tags$li("Allow comparison of difference of temperature with the average over all periods")
