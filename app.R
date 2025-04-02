@@ -984,14 +984,5 @@ shiny::shinyApp(
       if (shiny::in_devmode()) cat("Event: download_overlay", sep = "\n")
       session$sendCustomMessage(type="jsCode", list(code = "window.location.assign('%s');" |> sprintf(vstore[["climatevar"]])))
     })
-
-    # Cleanup when the app stops
-    shiny::onStop(function() {
-      # Remove all files in the tempdir and the directory itself
-      d <- list.dirs(tempdir(), full.names = TRUE, recursive = TRUE) |>
-        setdiff(tempdir())
-      unlink(d, recursive = TRUE)
-    })
-
   }
 )
